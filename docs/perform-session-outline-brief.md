@@ -5,7 +5,7 @@
 **Venue:** Dynatrace Perform 2026 (Hotday) · 3-hour hands-on lab
 **Owners:** Henrik Rexed, Adam (co-facilitators)
 **Prepared for:** n+1 → board discussion · **Issue:** ISI-4025 · **Date:** 2026-09-15
-**Status:** structure approved internally (Henrik + Adam); **one board decision pending** (see §5)
+**Status:** structure approved internally (Henrik + Adam); **one board decision pending** (see §6)
 
 ---
 
@@ -20,7 +20,27 @@ quality on every release**. Every step lands live in Dynatrace, configured throu
 *The application (the public Vegas Casino from Perform-Hackathon-2026) is the vehicle — what
 matters is the content: the cost, control, and quality practices every enterprise needs.*
 
-## 2. Why this session (business value)
+## 2. The story in short (read before the detailed agenda)
+
+OpenTelemetry looks like a simple journey: instrument the app, export the data, watch a
+dashboard light up. Then reality arrives — **the bill explodes**, **PII leaks into logs**, and
+telemetry quality quietly **regresses release after release**. The lesson every team learns the
+hard way: observability isn't a one-time setup, it's a discipline. **Sustainable observability
+demands the right process and the right checks.**
+
+This session walks that full journey in three acts:
+
+1. **Act 1 — Fix it.** Get telemetry *correct*: OTel core principles, declarative SDK config,
+   then the collector as the control point — configured simply with BindPlane, landing in Dynatrace.
+2. **Act 2 — Control the cost.** Where the money leaks: tame metric **cardinality**, redact
+   **PII** from logs, apply **tail sampling**, and use **cost allocation** to catch abnormal ingestion.
+3. **Act 3 — Govern the quality.** Make it *stay* good: **Weaver** + **GitHub Actions** gates
+   that report observability quality and catch regressions on every release.
+
+Attendees leave not with "OTel that works," but with a repeatable playbook for observability
+that is **cheaper, safer, and trustworthy over time**.
+
+## 3. Why this session (business value)
 
 - **Observability cost is a board-level line item.** Attendees leave able to cut ingestion
   cost without losing signal — cardinality control, PII-safe logs, and tail sampling are
@@ -33,7 +53,7 @@ matters is the content: the cost, control, and quality practices every enterpris
   with Dynatrace + BindPlane as the platform that makes cost and quality manageable.
 - **Reusable enablement asset** after Perform, grounded in the facilitators' field experience.
 
-## 3. Format at a glance
+## 4. Format at a glance
 
 | | |
 |---|---|
@@ -45,7 +65,7 @@ matters is the content: the cost, control, and quality practices every enterpris
 | **Core tools** | OTel SDK declarative config, BindPlane (collector fleet), Weaver, GitHub Actions, Dynatrace |
 | **Staffing** | 1 lead + 2 floating assistants per ~40 attendees |
 
-## 4. Outline — the arc: Fix → Control cost → Govern quality
+## 5. Outline — the arc: Fix → Control cost → Govern quality
 
 | Time | Module | What attendees do |
 |---|---|---|
@@ -61,7 +81,7 @@ matters is the content: the cost, control, and quality practices every enterpris
 **Takeaways:** attendees leave with the lab repo, working configs they wrote themselves, and a
 repeatable playbook for **cheaper, safer, higher-quality observability** — not just "OTel that works."
 
-## 5. Board decision — AI agents for attendees (Copilot licenses)
+## 6. Board decision — AI agents for attendees (Copilot licenses)
 
 This is the open question for the board. The content above is deliberately ambitious for
 180 minutes; **AI-agent licenses are what let us cover all of it at depth.**
@@ -78,13 +98,13 @@ This is the open question for the board. The content above is deliberately ambit
 **additive layer** that unlocks the deeper cost + quality content. A *yes* raises the ceiling;
 a *no* costs us nothing — which de-risks the board decision.
 
-## 6. What we need from the board
+## 7. What we need from the board
 
 1. **Decision:** approve securing Copilot/AI-agent licenses for attendees (or confirm baseline-only).
 2. If yes — **owner + budget** for license procurement and count (est. one per attendee, ~40/session).
 3. Confirmation of **room/slot and expected headcount** at Perform (drives staffing ratio).
 
-## 7. Status & next steps
+## 8. Status & next steps
 
 - Title reworked to a business framing (cost + quality); "Beyond the Honeymoon" dropped per board feedback.
 - Content arc expanded per Henrik: cost control (cardinality, PII, tail sampling), cost
