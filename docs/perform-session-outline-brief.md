@@ -1,7 +1,8 @@
 # Session Outline Brief — for board review
 
-**Session:** *Beyond the Honeymoon: OpenTelemetry in Practice* — 3-hour hands-on training
-**Venue:** Dynatrace Perform 2026 (Hotday)
+**Session (working title):** *Production-Grade OpenTelemetry: Controlling the Cost and Quality of Observability*
+*Alt:* *Observability You Can Afford — Cost, Control & Quality with OpenTelemetry and Dynatrace*
+**Venue:** Dynatrace Perform 2026 (Hotday) · 3-hour hands-on lab
 **Owners:** Henrik Rexed, Adam (co-facilitators)
 **Prepared for:** n+1 → board discussion · **Issue:** ISI-4025 · **Date:** 2026-09-15
 **Status:** structure approved internally (Henrik + Adam); **one board decision pending** (see §5)
@@ -10,22 +11,27 @@
 
 ## 1. One-line summary
 
-A 3-hour, hands-on Perform lab where attendees take a deliberately broken microservices
-application (the **Vegas Casino** from the open-source Perform-Hackathon-2026) from broken
-telemetry to a production-grade OpenTelemetry pipeline — SDK config first, collector
-second — with every fix landing live in Dynatrace.
+A 3-hour, hands-on Perform lab where attendees take a real microservices application from
+broken, expensive, ungoverned telemetry to a **production-grade OpenTelemetry pipeline** —
+fixing it, then **controlling its cost** (metric cardinality, log PII, trace sampling),
+**allocating and detecting abnormal ingestion cost**, and finally **guarding telemetry
+quality on every release**. Every step lands live in Dynatrace, configured through BindPlane.
 
-## 2. Why this session (value to Dynatrace & Perform)
+*The application (the public Vegas Casino from Perform-Hackathon-2026) is the vehicle — what
+matters is the content: the cost, control, and quality practices every enterprise needs.*
 
-- **Positions Dynatrace as the OpenTelemetry authority.** The whole session is vendor-neutral
-  OTel done *right*, with Dynatrace as the destination that just works — the strongest possible
-  proof point for our "open by default" story.
-- **Meets the audience where the pain is.** Attendees have deployed OTel and hit the wall:
-  config sprawl, runaway cost, dropped traces. This session sells the *operational* maturity
-  they're missing — and BindPlane + Dynatrace as the answer.
-- **Reusable asset.** Built on the upcoming book *Beyond the Honeymoon: OTel at Enterprise
-  Scale* and a public GitHub app — the lab lives on as enablement content after Perform.
-- **Grounded in real facilitators' field experience**, not slideware.
+## 2. Why this session (business value)
+
+- **Observability cost is a board-level line item.** Attendees leave able to cut ingestion
+  cost without losing signal — cardinality control, PII-safe logs, and tail sampling are
+  direct, measurable savings.
+- **Data governance & compliance.** Redacting PII in logs at the collector is a concrete risk
+  reduction attendees can take home Monday.
+- **Reliability of the observability itself.** Bad or regressed telemetry breaks incident
+  response; quality gates (Weaver + CI) make observability trustworthy release over release.
+- **Positions Dynatrace as the OpenTelemetry authority** — vendor-neutral OTel done right,
+  with Dynatrace + BindPlane as the platform that makes cost and quality manageable.
+- **Reusable enablement asset** after Perform, grounded in the facilitators' field experience.
 
 ## 3. Format at a glance
 
@@ -33,48 +39,44 @@ second — with every fix landing live in Dynatrace.
 |---|---|
 | **Duration** | 180 min, instructor-led hands-on |
 | **Level** | Intermediate — attendees own (or are about to own) OTel across a fleet |
-| **Environment** | GitHub Codespace — kind cluster, casino app, Dynatrace tenant, BindPlane. No local setup |
+| **Environment** | GitHub Codespace — kind cluster, sample app, Dynatrace tenant, BindPlane. No local setup |
 | **Attendee brings** | Laptop + GitHub account |
-| **Application** | **Vegas Casino** (Perform-Hackathon-2026) — *decision settled with Adam* |
-| **Core tools** | OTel SDK declarative config (`otel-config.yaml`), BindPlane (collector fleet), Dynatrace |
+| **Application (vehicle)** | Vegas Casino (Perform-Hackathon-2026), shipped deliberately broken |
+| **Core tools** | OTel SDK declarative config, BindPlane (collector fleet), Weaver, GitHub Actions, Dynatrace |
 | **Staffing** | 1 lead + 2 floating assistants per ~40 attendees |
 
-## 4. Outline — baseline session (no attendee AI licenses required)
+## 4. Outline — the arc: Fix → Control cost → Govern quality
 
-The casino ships broken on purpose. Attendees diagnose, fix, and operate it in five moves,
-each ending with a visible win in Dynatrace.
-
-| Time | Module | What they do |
+| Time | Module | What attendees do |
 |---|---|---|
-| 0:00–0:15 | **M0 — The Honeymoon Problem** | Framing + Codespace/env check |
-| 0:15–0:45 | **M1 — Tour the broken casino** | OTel core principles; hunt planted defects (broken propagation, `unknown_service`, missing logs) |
-| 0:45–1:15 | **M2 — SDK config by file** | Fix declarative `otel-config.yaml`: resource, propagators, samplers, batch, OTLP exporters |
-| 1:15–1:25 | Break | |
-| 1:25–2:05 | **M3 — Collector as control point (BindPlane)** | Fix processor order + `memory_limiter`, add routing/enrichment, staged rollout — *centerpiece* |
-| 2:05–2:35 | **M4 — Sampling as a strategy** | Head vs. tail sampling, spanmetrics; defend the cost/fidelity trade-off |
-| 2:35–3:00 | **M5 — Operate at scale + readiness checklist** | Fleet ops, config safety, Q&A |
+| 0:00–0:15 | **M0 — Why cost & quality decide observability's future** | Business framing + Codespace/env check |
+| 0:15–0:50 | **M1 — Fix the broken pipeline (SDK first)** | OTel core principles; fix declarative SDK config so telemetry flows correctly into Dynatrace |
+| 0:50–1:20 | **M2 — The collector as control point (BindPlane)** | Build/fix the collector pipeline the simple way with BindPlane |
+| 1:20–1:30 | Break | |
+| 1:30–2:15 | **M3 — Control the cost of observability** *(centerpiece)* | **Metrics:** tame insane cardinality · **Logs:** redact PII at the collector · **Traces:** tail-sampling strategy |
+| 2:15–2:35 | **M4 — Measure & allocate the bill** | Cost allocation to measure ingestion and detect abnormal cost spikes |
+| 2:35–2:57 | **M5 — Guard telemetry quality on every release** | Weaver for semantic conventions + GitHub Actions reporting observability quality / regressions per release |
+| 2:57–3:00 | Close & survey | |
 
-**Takeaways:** attendees leave with the lab repo, working configs they wrote themselves, and
-a mental model of what "production-grade OTel" actually means.
+**Takeaways:** attendees leave with the lab repo, working configs they wrote themselves, and a
+repeatable playbook for **cheaper, safer, higher-quality observability** — not just "OTel that works."
 
 ## 5. Board decision — AI agents for attendees (Copilot licenses)
 
-This is the open question the board is asked to weigh in on. Securing **GitHub Copilot (or
-equivalent AI-agent) licenses for attendees during the session** changes what we can deliver.
+This is the open question for the board. The content above is deliberately ambitious for
+180 minutes; **AI-agent licenses are what let us cover all of it at depth.**
 
 | | **Baseline** (no licenses) | **AI-augmented** (with licenses) |
 |---|---|---|
-| **Scope** | 5 modules, guided fixes | Same spine + deeper, more open-ended labs |
+| **Coverage** | Fix + collector + cost control; quality-gates as guided demo | Full arc hands-on incl. Weaver + CI quality gates per attendee |
 | **Complexity** | Facilitator-paced, uniform | Attendees use AI agents to reason about config, generate/repair YAML, explore edge cases at their own pace |
-| **Added topics we can reach** | — | Semantic conventions + Weaver, taming hostile/unstructured sources (XML, non-friendly logs), custom collector components, richer sampling design |
-| **Throughput** | Limited by hand-holding | Agents absorb boilerplate → more ground covered in the same 180 min |
-| **Attendee "wow"** | Strong | Differentiated — models the AI-assisted workflow attendees will actually use at work |
-| **Risk** | None new | Licensing cost + provisioning; needs a no-AI fallback path so the session is robust either way |
+| **Throughput** | Limited by hand-holding | Agents absorb boilerplate → the fuller cost + governance content fits in 180 min |
+| **Attendee "wow"** | Strong | Differentiated — models the AI-assisted workflow attendees actually use at work |
+| **Risk** | None new | Licensing cost + provisioning; needs a no-AI fallback so the session is robust either way |
 
-**Recommendation:** design the session so the baseline is fully self-sufficient, and treat AI
-agents as an **additive layer** — if licenses land, we switch on the deeper track; if not, the
-session still delivers in full. This de-risks the board decision: a *yes* raises the ceiling,
-a *no* costs us nothing.
+**Recommendation:** design the baseline to be fully self-sufficient and treat AI agents as an
+**additive layer** that unlocks the deeper cost + quality content. A *yes* raises the ceiling;
+a *no* costs us nothing — which de-risks the board decision.
 
 ## 6. What we need from the board
 
@@ -84,8 +86,10 @@ a *no* costs us nothing.
 
 ## 7. Status & next steps
 
-- Application choice (casino) — **settled** with Adam.
-- Detailed structure, agenda, and planted-defect inventory — **drafted** (`training-structure.md`),
-  validated against the real app (ISI-4030).
+- Title reworked to a business framing (cost + quality); "Beyond the Honeymoon" dropped per board feedback.
+- Content arc expanded per Henrik: cost control (cardinality, PII, tail sampling), cost
+  allocation, and telemetry quality gates (Weaver + GitHub Actions).
+- Application choice (casino, as vehicle) — **settled** with Adam.
+- Detailed structure + planted-defect inventory — **drafted** (`training-structure.md`), to be
+  extended for the new cost/quality modules.
 - **Blocking only the AI-augmented track:** the licensing decision above.
-- On a *yes*, next step is to spec the AI-augmented lab extensions as child stories.
