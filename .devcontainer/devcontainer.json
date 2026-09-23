@@ -1,0 +1,65 @@
+{
+	"name": "Vegas Casino Environment",
+
+	// Use a base image that has vscode user pre-configured
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+	"hostRequirements": {
+		"cpus": 4
+	},
+
+	"features": {
+		"ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
+			"version": "latest",
+			"enableNonRootDocker": "true",
+			"moby": "true"
+		}
+	},
+
+	// Set the remote user
+	"remoteUser": "vscode",
+	"forwardPorts": [8080],
+	"portsAttributes": {
+
+		"8080": { "label": "Gateway HTTP" }
+	},
+
+	// Install kind and run your setup scripts
+	"postCreateCommand": "bash -c 'set -e; chmod +x .devcontainer/post_create.sh && chmod +x codespace/configuration/init.sh && chmod +x codespace/deployment.sh && echo \"Running post_create.sh...\" && .devcontainer/post_create.sh && echo \"Running init.sh...\" && codespace/configuration/init.sh && echo \"Running deployment.sh...\" && codespace/deployment.sh'",
+
+	// Add recommended secrets
+	"secrets": {
+		"DYNATRACE_ENVIRONMENT_ID": {
+			"description": "eg. abc12345 from https://abc12345.apps.dynatrace.com"
+		},
+		"DYNATRACE_ENVIRONMENT": {
+			"description": "Either `live`, `sprint` or `dev`. If unsure, use `live`"
+		},
+		"DYNATRACE_API_TOKEN": {
+			"description": "Dynatrace access token with these permissions: `apiTokens.read` & `apiTokens.write`"
+		  },
+		  "DYNATRACE_PLATFORM_TOKEN": {
+			"description": "Dynatrace platform token with these permissions: `davis-copilot:conversations:execute`"
+		  },
+		  "DYNATRACE_OAUTH_CLIENT_ID": {
+			"description": "Dynatrace OAuth client id. Needs these permissions: `automation:workflows:read`, `automation:workflows:write`, `document:documents:write`, `document:documents:read`, `document:documents:delete`, `app-engine:edge-connects:connect`, `app-engine:edge-connects:write`, `app-engine:edge-connects:read`, `app-engine:edge-connects:delete`, `oauth2:clients:manage`, `settings:objects:read`, `settings:objects:write`, `storage:events:write` ...etc"
+		  },
+		  "DYNATRACE_OAUTH_CLIENT_SECRET": {
+			"description": "Dynatrace OAuth client secret. See `DYNATRACE_OAUTH_CLIENT_ID` for permissions"
+		  },
+		  "DYNATRACE_ACCOUNT_ID": {
+			"description": "Dynatrace account id"
+		  }
+	},
+
+	// Add Kubernetes VSCode extensions
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-kubernetes-tools.vscode-kubernetes-tools",
+				"redhat.vscode-yaml"
+			]
+		}
+	}
+}

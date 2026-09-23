@@ -1,0 +1,291 @@
+name: Generate SBOM
+
+on:
+  workflow_run:
+    workflows: ["Docker Build and Push"]
+    types:
+      - completed
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/vegasapp
+  PLATFORM: linux/amd64
+
+jobs:
+  generate-sbom:
+    name: Generate SBOM for ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      matrix:
+        service:
+          - gateway
+          - slots
+          - blackjack
+          - frontend
+          - roulette
+          - dice
+          - scoring
+          - dashboard
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          sha: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify authentication
+        run: |
+          echo "Testing GHCR authentication..."
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.repository_owner }} --password-stdin || {
+            echo "⚠️ Authentication failed, but continuing..."
+          }
+
+      - name: Extract metadata (matching docker-build workflow)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image from registry
+        id: pull
+        continue-on-error: true
+        run: |
+          set -e
+          # Initialize outputs
+          echo "pulled=false" >> $GITHUB_OUTPUT
+          echo "image=" >> $GITHUB_OUTPUT
+          
+          # Try tags in order of preference
+          TAGS="${{ steps.meta.outputs.tags }}"
+          IMAGE_BASE="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}"
+          CURRENT_REF="${{ github.event.workflow_run.head_branch || github.ref_name }}"
+          CURRENT_SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          SHORT_SHA="${CURRENT_SHA:0:7}"
+          
+          echo "Current context:"
+          echo "  Branch/Ref: ${CURRENT_REF}"
+          echo "  SHA: ${CURRENT_SHA}"
+          echo "  Short SHA: ${SHORT_SHA}"
+          echo ""
+          echo "Available tags from metadata:"
+          echo "$TAGS"
+          echo ""
+          
+          # Build tag candidates - prioritize likely-to-exist tags
+          TAG_CANDIDATES=()
+          
+          # First, try tags from metadata action (these are most likely to exist)
+          while IFS= read -r tag; do
+            tag=$(echo "$tag" | tr -d ' ')
+            # Skip empty tags, full SHA (40 chars), and current full SHA
+            # Also skip tags that are just the SHA without a prefix
+            if [ -n "$tag" ] && \
+               [ "$tag" != "${CURRENT_SHA}" ] && \
+               ! echo "$tag" | grep -qE '^[a-f0-9]{40}$' && \
+               ! echo "$tag" | grep -qE ':[a-f0-9]{40}$' && \
+               ! echo "$IMAGE_BASE:${tag}" | grep -qE ':[a-f0-9]{40}$'; then
+              TAG_CANDIDATES+=("$tag")
+            fi
+          done <<< "$TAGS"
+          
+          # Then try common patterns (but NOT full SHA)
+          if [ -n "$CURRENT_REF" ] && [ "$CURRENT_REF" != "null" ] && [ "$CURRENT_REF" != "" ]; then
+            TAG_CANDIDATES+=("${CURRENT_REF}-${SHORT_SHA}")
+            TAG_CANDIDATES+=("${CURRENT_REF}")
+          fi
+          
+          # Try latest for main branch
+          if [[ "$CURRENT_REF" == "main" ]]; then
+            TAG_CANDIDATES+=("latest")
+          fi
+          
+          echo "Trying to pull image with ${#TAG_CANDIDATES[@]} tag candidates..."
+          echo "Tag order: ${TAG_CANDIDATES[*]}"
+          echo ""
+          
+          MAX_RETRIES=3
+          PULLED=false
+          for tag in "${TAG_CANDIDATES[@]}"; do
+            if [ -z "$tag" ]; then
+              continue
+            fi
+            
+            # Double-check this isn't a full SHA
+            if echo "${tag}" | grep -qE '^[a-f0-9]{40}$'; then
+              echo "⚠️ Skipping full SHA tag: ${tag}"
+              continue
+            fi
+            
+            echo "Attempting to pull: ${IMAGE_BASE}:${tag}"
+            RETRY_COUNT=0
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              # Use docker pull and capture exit code
+              if docker pull "${IMAGE_BASE}:${tag}" >/dev/null 2>&1; then
+                # Verify the image actually exists locally
+                if docker image inspect "${IMAGE_BASE}:${tag}" >/dev/null 2>&1; then
+                  echo "✅ Successfully pulled and verified image with tag: ${tag}"
+                  echo "tag=${tag}" >> $GITHUB_OUTPUT
+                  echo "image=${IMAGE_BASE}:${tag}" >> $GITHUB_OUTPUT
+                  echo "pulled=true" >> $GITHUB_OUTPUT
+                  
+                  # Get image digest for more reliable reference
+                  DIGEST=$(docker inspect "${IMAGE_BASE}:${tag}" --format='{{index .RepoDigests 0}}' 2>/dev/null || echo "")
+                  if [ -n "$DIGEST" ] && [ "$DIGEST" != "null" ]; then
+                    echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+                    echo "Using image digest: ${DIGEST}"
+                  fi
+                  PULLED=true
+                  break 2
+                else
+                  echo "  Image pulled but not found locally, retrying..."
+                fi
+              else
+                echo "  Pull failed (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+              fi
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                sleep 5
+              fi
+            done
+            echo ""
+          done
+          
+          if [ "$PULLED" != "true" ]; then
+            echo "⚠️ Failed to pull image with any tag format"
+            echo "Tried ${#TAG_CANDIDATES[@]} tags: ${TAG_CANDIDATES[*]}"
+            echo "pulled=false" >> $GITHUB_OUTPUT
+            echo "image=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify image reference before SBOM generation
+        if: steps.pull.outputs.pulled == 'true'
+        id: verify-image
+        run: |
+          # Prefer digest if available, otherwise use image tag
+          IMAGE_REF="${{ steps.pull.outputs.digest || steps.pull.outputs.image }}"
+          
+          if [ -z "$IMAGE_REF" ] || [ "$IMAGE_REF" == "null" ] || [ "$IMAGE_REF" == "" ]; then
+            echo "❌ Invalid image reference: empty or null"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "Verifying image reference: $IMAGE_REF"
+          
+          # Check if it's a full SHA tag (40 hex chars after colon) - these usually don't exist as tags
+          if echo "$IMAGE_REF" | grep -qE ':[a-f0-9]{40}$'; then
+            echo "❌ Image reference contains a full SHA tag (40 chars), which likely doesn't exist"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # Check if it's just a SHA without colon (standalone SHA)
+          if echo "$IMAGE_REF" | grep -qE '^[a-f0-9]{40}$'; then
+            echo "❌ Image reference is a standalone SHA, invalid"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # Verify the image actually exists locally (if it was pulled)
+          if ! echo "$IMAGE_REF" | grep -qE '@sha256:'; then
+            # It's a tag reference, verify it exists
+            if ! docker image inspect "$IMAGE_REF" >/dev/null 2>&1; then
+              echo "❌ Image reference does not exist locally: $IMAGE_REF"
+              echo "valid=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          fi
+          
+          echo "✅ Image reference looks valid and exists: $IMAGE_REF"
+          echo "valid=true" >> $GITHUB_OUTPUT
+          echo "image=$IMAGE_REF" >> $GITHUB_OUTPUT
+
+      - name: Generate SBOM with Syft
+        if: steps.pull.outputs.pulled == 'true' && steps.verify-image.outputs.valid == 'true'
+        continue-on-error: true
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.verify-image.outputs.image }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.service }}.json
+          registry-username: ${{ github.repository_owner }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate SBOM (SPDX format)
+        if: steps.pull.outputs.pulled == 'true' && steps.verify-image.outputs.valid == 'true'
+        continue-on-error: true
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.verify-image.outputs.image }}
+          format: spdx
+          output-file: sbom-${{ matrix.service }}.spdx
+          registry-username: ${{ github.repository_owner }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate SBOM (CycloneDX format)
+        if: steps.pull.outputs.pulled == 'true' && steps.verify-image.outputs.valid == 'true'
+        continue-on-error: true
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.verify-image.outputs.image }}
+          format: cyclonedx-json
+          output-file: sbom-${{ matrix.service }}.cdx.json
+          registry-username: ${{ github.repository_owner }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if SBOM files exist
+        id: check-sbom
+        continue-on-error: true
+        run: |
+          FILES_EXIST=false
+          if [ -f "sbom-${{ matrix.service }}.json" ] || [ -f "sbom-${{ matrix.service }}.spdx" ] || [ -f "sbom-${{ matrix.service }}.cdx.json" ]; then
+            FILES_EXIST=true
+          fi
+          echo "exists=${FILES_EXIST}" >> $GITHUB_OUTPUT
+
+      - name: Upload SBOM artifacts
+        if: steps.check-sbom.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.service }}
+          path: |
+            sbom-${{ matrix.service }}.json
+            sbom-${{ matrix.service }}.spdx
+            sbom-${{ matrix.service }}.cdx.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Attach SBOM to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            sbom-${{ matrix.service }}.json
+            sbom-${{ matrix.service }}.spdx
+            sbom-${{ matrix.service }}.cdx.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

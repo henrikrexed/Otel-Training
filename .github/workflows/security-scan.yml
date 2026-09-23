@@ -1,0 +1,285 @@
+name: Security Scanning
+
+on:
+  workflow_run:
+    workflows: ["Docker Build and Push"]
+    types:
+      - completed
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/vegasapp
+
+jobs:
+  trivy-scan:
+    name: Security Scan (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      matrix:
+        service:
+          - gateway
+          - slots
+          - blackjack
+          - frontend
+          - roulette
+          - dice
+          - scoring
+          - dashboard
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          sha: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (matching docker-build workflow)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull image from registry
+        id: pull
+        continue-on-error: true
+        run: |
+          TAGS="${{ steps.meta.outputs.tags }}"
+          IMAGE_BASE="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}"
+          CURRENT_REF="${{ github.event.workflow_run.head_branch || github.ref_name }}"
+          CURRENT_SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          SHORT_SHA="${CURRENT_SHA:0:7}"
+          
+          echo "Current context:"
+          echo "  Branch/Ref: ${CURRENT_REF}"
+          echo "  SHA: ${CURRENT_SHA}"
+          echo "  Short SHA: ${SHORT_SHA}"
+          echo ""
+          echo "Available tags from metadata:"
+          echo "$TAGS"
+          echo ""
+          
+          # Build tag candidates - prioritize likely-to-exist tags
+          TAG_CANDIDATES=()
+          
+          # First, try tags from metadata action (these are most likely to exist)
+          while IFS= read -r tag; do
+            tag=$(echo "$tag" | tr -d ' ')
+            if [ -n "$tag" ] && [ "$tag" != "${CURRENT_SHA}" ]; then
+              TAG_CANDIDATES+=("$tag")
+            fi
+          done <<< "$TAGS"
+          
+          # Then try common patterns
+          if [ -n "$CURRENT_REF" ] && [ "$CURRENT_REF" != "null" ]; then
+            TAG_CANDIDATES+=("${CURRENT_REF}-${SHORT_SHA}")
+            TAG_CANDIDATES+=("${CURRENT_REF}")
+          fi
+          
+          # Try latest for main branch
+          if [[ "$CURRENT_REF" == "main" ]]; then
+            TAG_CANDIDATES+=("latest")
+          fi
+          
+          echo "Trying to pull image with ${#TAG_CANDIDATES[@]} tag candidates..."
+          echo "Tag order: ${TAG_CANDIDATES[*]}"
+          echo ""
+          
+          MAX_RETRIES=3
+          for tag in "${TAG_CANDIDATES[@]}"; do
+            if [ -z "$tag" ]; then
+              continue
+            fi
+            
+            echo "Attempting to pull: ${IMAGE_BASE}:${tag}"
+            RETRY_COUNT=0
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if docker pull "${IMAGE_BASE}:${tag}" 2>&1; then
+                echo "✅ Successfully pulled image with tag: ${tag}"
+                echo "tag=${tag}" >> $GITHUB_OUTPUT
+                echo "image=${IMAGE_BASE}:${tag}" >> $GITHUB_OUTPUT
+                echo "pulled=true" >> $GITHUB_OUTPUT
+                exit 0
+              else
+                echo "  Pull failed (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+              fi
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                sleep 5
+              fi
+            done
+            echo ""
+          done
+          
+          echo "⚠️ Could not pull image, will scan filesystem only"
+          echo "pulled=false" >> $GITHUB_OUTPUT
+          echo "image=" >> $GITHUB_OUTPUT
+
+      - name: Run Trivy vulnerability scanner (filesystem)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: ./services/${{ matrix.service }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}-fs.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
+      - name: Run Trivy vulnerability scanner (image)
+        if: steps.pull.outputs.pulled == 'true'
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: ${{ steps.pull.outputs.image }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}-image.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+
+      - name: Check if filesystem SARIF exists
+        id: check-fs-sarif
+        continue-on-error: true
+        run: |
+          if [ -f "trivy-results-${{ matrix.service }}-fs.sarif" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload Trivy filesystem results to GitHub Security
+        if: always() && steps.check-fs-sarif.outputs.exists == 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}-fs.sarif'
+          wait-for-processing: true
+
+      - name: Check if image SARIF exists
+        id: check-image-sarif
+        if: steps.pull.outputs.pulled == 'true'
+        continue-on-error: true
+        run: |
+          if [ -f "trivy-results-${{ matrix.service }}-image.sarif" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload Trivy image results to GitHub Security
+        if: always() && steps.pull.outputs.pulled == 'true' && steps.check-image-sarif.outputs.exists == 'true'
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}-image.sarif'
+          wait-for-processing: true
+
+      - name: Run Trivy scan (table format - filesystem)
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: ./services/${{ matrix.service }}
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Run Trivy scan (table format - image)
+        if: steps.pull.outputs.pulled == 'true'
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: ${{ steps.pull.outputs.image }}
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        continue-on-error: true
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript', 'python', 'java', 'go']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Install dependencies for CodeQL
+        run: |
+          if [ "${{ matrix.language }}" == "javascript" ]; then
+            npm install -g jest
+            (cd services/gateway && npm install) || true
+            (cd services/slots && npm install) || true
+            (cd services/blackjack && npm install) || true
+            (cd services/frontend && npm install) || true
+            (cd services/dashboard && npm install) || true
+          elif [ "${{ matrix.language }}" == "python" ]; then
+            (cd services/roulette/python && pip install -r requirements.txt) || true
+          elif [ "${{ matrix.language }}" == "java" ]; then
+            (cd services/scoring && mvn dependency:go-offline) || true
+          elif [ "${{ matrix.language }}" == "go" ]; then
+            (cd services/dice/go && go mod download) || true
+          fi
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+        continue-on-error: true
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        continue-on-error: true
+
+
+
+

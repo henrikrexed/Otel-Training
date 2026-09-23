@@ -1,0 +1,118 @@
+site_name: Vegas Casino - Observability Hackathon
+site_description: A microservices-based casino application designed for observability and feature flag instrumentation
+site_author: Vegas Casino Team
+site_url: https://dynatrace-oss.github.io/Perform-Hackathon-2026
+
+repo_name: Perform-Hackathon-2026
+repo_url: https://github.com/dynatrace-oss/Perform-Hackathon-2026
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - scheme: default               
+      primary: purple
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: purple
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+    - content.code.copy
+    - content.tooltips
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - assets/css/dynatrace-theme.css
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+nav:
+  - Welcome: index.md
+  - Hackathon:
+    - Hackathon Overview: overview/hackathon-index.md
+    - GitHub:
+      - Introduction to GitHub Copilot: overview/Challenge-01.md
+      - Best Practices When Using Copilot: overview/Challenge-02.md
+      - Extending GitHub Copilot with Model Context Protocol: overview/Challenge-03.md
+    - Dynatrace:
+      - Launching your Environment: overview/DTChallenge-00.md
+      - Prompt your observability data: overview/DTChallenge-01.md
+      - Improve your OpenTelemetry instrumentation: overview/DTChallenge-02.md
+      - Improve your Dynatrace Setup: overview/DTChallenge-03.md
+    - Bonus:
+      - Customizing GitHub Copilot in Your IDE: overview/Challenge-04.md
+      - Convert B-MAD Agent to GitHub Copilot Agent: overview/Challenge-05.md
+      - Build a Custom Dynatrace App: overview/DTChallenge-04.md
+  - Environment Setup:
+    - DevContainer Overview: deployment/devcontainer.md
+    - Deployment Architecture: deployment/index.md
+  - Development:
+    - Source Code Locations: development/source-code.md
+    - GitHub Actions Workflow: development/github-actions.md
+    - Updating with Helm: development/helm-updates.md
+    - Feature Flags Guide: development/feature-flags.md
+  - Architecture:
+    - System Architecture: architecture/index.md
+    - Components: architecture/components.md
+  - Contributing: contributing.md
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+
+# Exclude files that are not meant to be standalone pages
+# (snippets are included via --8<-- syntax, old content, etc.)
+exclude_docs: |
+  snippets/**
+  overview/hackathon.md
+  overview/index.md
+  getting-started.md
+  architecture/technology.md
+  deployment/ci-cd.md
+  deployment/helm.md
+  deployment/k8s-vs-helm.md
+  deployment/manifests.md
+  deployment/openfeature.md
+  development/building.md
+  development/docker.md
+  testing/**
+
