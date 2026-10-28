@@ -9,7 +9,8 @@
       "KIND_VERSION": "${localEnv:KIND_VERSION:v0.25.0}",
       "ARGOCD_VERSION": "${localEnv:ARGOCD_VERSION:v2.13.2}",
       "YQ_VERSION": "${localEnv:YQ_VERSION:v4.44.6}",
-      "DTCTL_VERSION": "${localEnv:DTCTL_VERSION:latest}"
+      "DTCTL_VERSION": "${localEnv:DTCTL_VERSION:v0.45.0}",
+      "DTCTL_REPO": "${localEnv:DTCTL_REPO:Dynatrace/dtctl}"
     }
   },
 

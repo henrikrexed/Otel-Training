@@ -15,7 +15,8 @@ HELM_VERSION="${HELM_VERSION:-v3.16.4}"
 KIND_VERSION="${KIND_VERSION:-v0.25.0}"
 ARGOCD_VERSION="${ARGOCD_VERSION:-v2.13.2}"
 YQ_VERSION="${YQ_VERSION:-v4.44.6}"
-DTCTL_VERSION="${DTCTL_VERSION:-latest}"
+DTCTL_VERSION="${DTCTL_VERSION:-v0.45.0}"   # Dynatrace/dtctl GoReleaser tag; "latest" resolves via API
+DTCTL_REPO="${DTCTL_REPO:-Dynatrace/dtctl}"  # was dynatrace-oss/dtctl — repo moved to the Dynatrace org
 FORCE="${FORCE:-0}"
 
 BIN_DIR="${BIN_DIR:-/usr/local/bin}"
@@ -77,29 +78,47 @@ install_yq() {
   install_bin yq /tmp/yq && rm -f /tmp/yq
 }
 
-# dtctl — Dynatrace control CLI. The download endpoint differs by environment, so
-# it is pluggable: set DTCTL_DOWNLOAD_URL to a direct binary URL, or DTCTL_VERSION
-# to pin a release tag. If neither resolves, we warn (non-fatal) so the rest of the
-# toolchain still installs — tenant wiring is handled by the DT operator ticket.
+# dtctl — Dynatrace platform CLI (github.com/Dynatrace/dtctl). Released by GoReleaser
+# as per-OS/arch tarballs: dtctl_<ver>_<os>_<arch>.tar.gz (e.g. dtctl_0.45.0_linux_amd64.tar.gz).
+# Source is still pluggable: set DTCTL_DOWNLOAD_URL to a direct .tar.gz (or bare binary)
+# for a custom/region mirror, or DTCTL_VERSION to pin a tag. Download failures are
+# non-fatal — the rest of the toolchain still installs; tenant wiring is a separate ticket.
 install_dtctl() {
   if have dtctl && [[ "$FORCE" != "1" ]]; then log "dtctl present: $(dtctl version 2>/dev/null || echo unknown)"; return; fi
   local url="${DTCTL_DOWNLOAD_URL:-}"
   if [[ -z "$url" ]]; then
-    # Default source. Override with DTCTL_DOWNLOAD_URL if your tenant/region differs.
-    if [[ "$DTCTL_VERSION" == "latest" ]]; then
-      url="https://github.com/dynatrace-oss/dtctl/releases/latest/download/dtctl-${OS}-${ARCH}"
-    else
-      url="https://github.com/dynatrace-oss/dtctl/releases/download/${DTCTL_VERSION}/dtctl-${OS}-${ARCH}"
+    local tag="$DTCTL_VERSION"
+    # "latest" has no stable filename (version is embedded in the asset name), so
+    # resolve the real tag via the GitHub API before constructing the URL.
+    if [[ "$tag" == "latest" ]]; then
+      tag="$(curl -fsSL "https://api.github.com/repos/${DTCTL_REPO}/releases/latest" \
+             | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
+      [[ -z "$tag" ]] && { echo "WARN: could not resolve latest dtctl tag from GitHub API" >&2; return; }
     fi
+    local ver="${tag#v}"   # GoReleaser asset names drop the leading v
+    url="https://github.com/${DTCTL_REPO}/releases/download/${tag}/dtctl_${ver}_${OS}_${ARCH}.tar.gz"
   fi
   log "installing dtctl from ${url}"
-  if curl -fsSLo /tmp/dtctl "$url"; then
-    install_bin dtctl /tmp/dtctl && rm -f /tmp/dtctl
-  else
+  if ! curl -fsSLo /tmp/dtctl.dl "$url"; then
     echo "WARN: could not download dtctl from ${url}." >&2
-    echo "WARN: set DTCTL_DOWNLOAD_URL (direct binary) or DTCTL_VERSION and re-run:" >&2
+    echo "WARN: set DTCTL_DOWNLOAD_URL (direct .tar.gz or binary) or DTCTL_VERSION and re-run:" >&2
     echo "WARN:   FORCE=1 bash .devcontainer/bootstrap/install-tools.sh" >&2
+    rm -f /tmp/dtctl.dl
+    return
   fi
+  # Accept either a gzip tarball (canonical) or a bare binary (custom mirrors).
+  if tar tzf /tmp/dtctl.dl >/dev/null 2>&1; then
+    local tmpd; tmpd="$(mktemp -d)"
+    tar xzf /tmp/dtctl.dl -C "$tmpd"
+    local bin; bin="$(find "$tmpd" -type f -name dtctl | head -n1)"
+    [[ -z "$bin" ]] && { echo "WARN: dtctl binary not found inside archive" >&2; rm -rf "$tmpd" /tmp/dtctl.dl; return; }
+    install_bin dtctl "$bin"
+    rm -rf "$tmpd"
+  else
+    install_bin dtctl /tmp/dtctl.dl
+  fi
+  rm -f /tmp/dtctl.dl
+  log "dtctl installed: $(dtctl version 2>/dev/null || echo 'installed (version check deferred)')"
 }
 
 main() {

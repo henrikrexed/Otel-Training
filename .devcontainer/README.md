@@ -43,24 +43,34 @@ in the container through `remoteEnv` in `devcontainer.json`.
 
 ## dtctl source
 
-`dtctl`'s download endpoint can differ by environment/region, so the installer is
-pluggable. Default is the `dynatrace-oss/dtctl` latest release. Override with:
+`dtctl` is the official **Dynatrace platform CLI** —
+[`github.com/Dynatrace/dtctl`](https://github.com/Dynatrace/dtctl) ("a
+kubectl-inspired CLI tool for managing Dynatrace platform resources"). The repo
+was moved out of the old `dynatrace-oss/dtctl` path into the `Dynatrace` org;
+releases are published by GoReleaser as per-OS/arch tarballs
+(`dtctl_<ver>_<os>_<arch>.tar.gz`, signed + SBOM per asset).
 
-- `DTCTL_VERSION=<tag>` to pin a release, **or**
-- `DTCTL_DOWNLOAD_URL=<direct binary url>` for a custom/region-specific source.
+The installer pins **`DTCTL_VERSION=v0.45.0`** by default (verified downloadable and
+runnable — `dtctl version` → `0.45.0`), matching the pinned-everything convention of
+the rest of the toolchain. Overrides for a custom/region mirror or a different tag:
 
-If the default source can't be reached at build time the installer **warns but
-does not fail** (the rest of the toolchain still installs). Re-run after setting
-the correct source:
+- `DTCTL_VERSION=<tag>` to pin another release (e.g. `v0.45.0`), or `latest` to
+  resolve the newest tag via the GitHub API, **or**
+- `DTCTL_REPO=<org/repo>` to point at a different repository, **or**
+- `DTCTL_DOWNLOAD_URL=<direct .tar.gz or binary url>` for a fully custom source
+  (the installer auto-detects tarball vs. bare binary).
+
+If the source can't be reached at build time the installer **warns but does not
+fail** (the rest of the toolchain still installs). Re-run after changing the source:
 
 ```bash
 FORCE=1 bash .devcontainer/bootstrap/install-tools.sh
 ```
 
-> ⚠️ **Action for the board/owner:** confirm the canonical `dtctl` download URL/tag
-> for Perform and set `DTCTL_VERSION` or `DTCTL_DOWNLOAD_URL` as a build arg /
-> Codespaces secret so the image bakes the exact binary. Tracked as an open item
-> on ISI-6791.
+> ℹ️ The public `Dynatrace/dtctl` release is correct for this training (tenant
+> wiring is done at runtime via `DT_TENANT` / `DT_API_TOKEN`). If Perform standardises
+> on a tenant- or region-specific dtctl mirror, set `DTCTL_DOWNLOAD_URL` as a
+> Codespaces secret / build arg to bake that exact binary instead.
 
 ## Cold start & pre-warm guidance (day-of)
 

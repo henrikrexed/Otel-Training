@@ -11,7 +11,8 @@ ARG HELM_VERSION=v3.16.4
 ARG KIND_VERSION=v0.25.0
 ARG ARGOCD_VERSION=v2.13.2
 ARG YQ_VERSION=v4.44.6
-ARG DTCTL_VERSION=latest
+ARG DTCTL_VERSION=v0.45.0
+ARG DTCTL_REPO=Dynatrace/dtctl
 
 # Base OS packages needed by the bootstrap + day-of labs.
 RUN apt-get update \
@@ -28,6 +29,7 @@ RUN KUBECTL_VERSION="${KUBECTL_VERSION}" \
     ARGOCD_VERSION="${ARGOCD_VERSION}" \
     YQ_VERSION="${YQ_VERSION}" \
     DTCTL_VERSION="${DTCTL_VERSION}" \
+    DTCTL_REPO="${DTCTL_REPO}" \
     bash /usr/local/share/install-tools.sh \
  && kubectl version --client=true --output=yaml >/dev/null \
  && helm version --short \
