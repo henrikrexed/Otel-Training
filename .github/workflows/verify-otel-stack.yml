@@ -1,0 +1,34 @@
+name: verify-otel-stack-isi6806
+# ISI-6806 live verification run — executes the exact devcontainer lifecycle
+# (install-tools.sh -> create-cluster.sh) then observability/install.sh against
+# the real Dynatrace tenant, on a GitHub-hosted ubuntu-24.04 runner
+# (Codespace-equivalent environment; Codespaces API is read-only for the agent PAT).
+on:
+  push:
+    branches: [verify/ISI-6806-otel-stack]
+
+concurrency:
+  group: isi6806-verify
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      VERIFY_SECRETS_URL: https://missile-setting-display-audit.trycloudflare.com/738ac78b8788f8dbe131504cad87ed6f/secrets
+      VERIFY_KEY: ff78d8ebc69fd27d33968d7e9aa0f9f5a032dc30d5594242
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ISI-6806 live verification
+        run: bash .devcontainer/verify/run-verification.sh
+      - name: Always upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isi6806-results
+          path: /tmp/isi6806-results.txt
+          if-no-files-found: ignore
