@@ -8,9 +8,14 @@
 # instrumented apps, enriches with Kubernetes metadata, converts cumulative
 # sum temporality to delta on counters, and exports to Dynatrace via OTLP.
 #
-# NOTE on `$${env:...}`: the OTel Operator expands `$`-expressions itself when
-# it renders the collector config. `$${env:FOO}` escapes through to the
-# collector, which resolves the variable at runtime from `spec.env`.
+# NOTE on `${env:...}`: the OTel Operator (v0.162, v1beta1 CRs) passes
+# spec.config through to the collector ConfigMap VERBATIM — it does not expand
+# `$`-expressions. `${env:FOO}` therefore reaches the collector unescaped and
+# is resolved at runtime from the container env (spec.env below). The older
+# `$${env:FOO}` double-escaping advice is obsolete and silently breaks
+# expansion (found live in ISI-6806: the collector treats `$$` as an escaped
+# literal, never expands, and the exporter dies with "endpoint must be a valid
+# URL" — while offline validation that manually un-escapes keeps passing).
 apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
@@ -114,9 +119,9 @@ spec:
       # with a path (`/api/v2/otlp`), and the collector appends
       # /v1/{traces,metrics,logs} to this base endpoint.
       otlphttp/dynatrace:
-        endpoint: $${env:DT_TENANT}/api/v2/otlp
+        endpoint: ${env:DT_TENANT}/api/v2/otlp
         headers:
-          Authorization: "Api-Token $${env:DT_INGEST_TOKEN}"
+          Authorization: "Api-Token ${env:DT_INGEST_TOKEN}"
         tls:
           # GOTCHA (found in live verification, ISI-6806): `insecure_skip_verify`
           # is a bool field — the collector's config decoder rejects env-expanded
@@ -124,7 +129,7 @@ spec:
           # and `otelcol validate` does NOT catch it (validate passed, the real
           # collector crash-looped). Bool fields must be literals. For private-CA
           # Dynatrace endpoints, mount the CA and set `ca_file` instead — string
-          # fields accept `$${env:...}` expansion.
+          # fields accept `${env:...}` expansion.
           insecure_skip_verify: false
         retry_on_failure:
           enabled: true
