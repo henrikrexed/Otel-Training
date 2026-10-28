@@ -70,6 +70,29 @@ Idempotent — safe to re-run (it `helm upgrade --install`s the operator and
 
 ## Verify (acceptance criteria)
 
+The runtime acceptance criteria ([ISI-6807](../../)) are scripted end-to-end.
+After `install.sh` completes, run:
+
+```bash
+STAMP="$(date -u +%Y%m%dT%H%M%SZ)" bash deploy/dynatrace/verify.sh
+```
+
+[`verify.sh`](./verify.sh) checks every AC and writes a timestamped evidence
+bundle to `deploy/dynatrace/evidence/` (git-ignored — attach it to the ticket):
+
+1. operator / webhook / `<name>-activegate-0` pods all `Running`,
+2. DynaKube conditions all `True` (+ phase),
+3. the cluster is registered in the tenant under **Kubernetes** (queries the
+   tenant Settings 2.0 API when `DT_TENANT`/`DT_API_TOKEN` are set; otherwise
+   prints the UI link to confirm + screenshot),
+4. **no double-ingest** — asserts the DynaKube has no `oneAgent` block and there
+   are no OneAgent pods or `dynatrace.com/inject=true` namespaces anywhere.
+
+Exit code `0` = all checks passed. It never writes token values to the evidence
+file.
+
+Manual equivalents, if you want to eyeball them:
+
 ```bash
 kubectl -n dynatrace get pods
 # -> dynatrace-operator-*, dynatrace-webhook-*, <name>-activegate-0  all Running
@@ -128,7 +151,9 @@ deploy/dynatrace/
 ├── dynakube.yaml         # DynaKube CR — Kubernetes-monitoring mode (config of record)
 ├── secret.example.yaml   # shape of the token Secret (NO real tokens)
 ├── install.sh            # idempotent: operator (helm) + Secret + DynaKube + health wait
-└── uninstall.sh          # ordered teardown
+├── verify.sh             # runtime AC checks (ISI-6807) → evidence bundle
+├── uninstall.sh          # ordered teardown
+└── evidence/             # verify.sh output (git-ignored)
 ```
 
 ## Notes / follow-ups
