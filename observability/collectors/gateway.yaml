@@ -106,10 +106,14 @@ spec:
         headers:
           Authorization: "Api-Token $${env:DT_INGEST_TOKEN}"
         tls:
-          # Private/managed Dynatrace endpoints with custom CAs can set
-          # DT_INSECURE_SKIP_VERIFY=true in the dynatrace-otel Secret
-          # (install.sh always sets it, defaulting to false).
-          insecure_skip_verify: $${env:DT_INSECURE_SKIP_VERIFY}
+          # GOTCHA (found in live verification, ISI-6806): `insecure_skip_verify`
+          # is a bool field — the collector's config decoder rejects env-expanded
+          # strings ("expected type 'bool', got unconvertible type 'string'"),
+          # and `otelcol validate` does NOT catch it (validate passed, the real
+          # collector crash-looped). Bool fields must be literals. For private-CA
+          # Dynatrace endpoints, mount the CA and set `ca_file` instead — string
+          # fields accept `$${env:...}` expansion.
+          insecure_skip_verify: false
         retry_on_failure:
           enabled: true
           initial_interval: 1s

@@ -93,6 +93,11 @@ Both CRs are also schema-checked against the operator's `v1beta1` CRD.
 - **`$${env:FOO}` escaping** — the OTel Operator expands `$`-expressions when
   rendering collector config; `$${env:FOO}` passes through to the collector,
   which resolves it at runtime from `envFrom: secretRef: dynatrace-otel`.
+- **Env expansion is stringly-typed** — `tls.insecure_skip_verify` is a bool
+  field: `insecure_skip_verify: $${env:FOO}}` passes `otelcol validate` but the
+  real collector crash-loops with *"expected type 'bool', got unconvertible
+  type 'string'"* (caught live in ISI-6806). Bool fields must be literals;
+  only string fields take env expansion.
 - **`otlphttp` not `otlp`** for Dynatrace: the ingest endpoint carries a path
   (`/api/v2/otlp`); the gRPC exporter rejects path-bearing endpoints at
   validation time. The collector appends `/v1/{traces,metrics,logs}`.
@@ -117,4 +122,9 @@ defect they hunt in the casino's planted broken config.
 |----------|-------|---------|
 | `DT_TENANT` | Codespaces secret → `dynatrace-otel` | gateway exporter endpoint |
 | `DT_INGEST_TOKEN` | Codespaces secret → `dynatrace-otel` | `Api-Token` auth header |
-| `DT_INSECURE_SKIP_VERIFY` | optional (`false` default) | custom-CA DT endpoints |
+
+Note: there is **no** `DT_INSECURE_SKIP_VERIFY` — `tls.insecure_skip_verify`
+is a bool field and the collector rejects env-expanded strings there
+(`otelcol validate` does not catch this; a live run crash-looped on it — see
+gotchas). Private-CA tenants should mount the CA and set `ca_file` (a string
+field, which does accept `$${env:...}`).

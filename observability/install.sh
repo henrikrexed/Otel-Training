@@ -6,8 +6,6 @@
 # Required env (attendee secrets, never committed):
 #   DT_TENANT       e.g. https://abc12345.live.dynatrace.com
 #   DT_INGEST_TOKEN OTLP data-ingest token
-# Optional env:
-#   DT_INSECURE_SKIP_VERIFY  "true" for private cert DT endpoints
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -57,10 +55,11 @@ kubectl -n opentelemetry-operator-system rollout status deploy \
 # --- 3. Namespace + Dynatrace secret (from attendee env; never in git) ------
 kubectl apply -f "${HERE}/collectors/namespace.yaml"
 log "creating dynatrace-otel secret in observability"
+# NB: no DT_INSECURE_SKIP_VERIFY here — bool fields in the collector config
+# cannot take env-expanded strings (ISI-6806 live finding); see gateway.yaml.
 kubectl -n observability create secret generic dynatrace-otel \
   --from-literal=DT_TENANT="${DT_TENANT}" \
   --from-literal=DT_INGEST_TOKEN="${DT_INGEST_TOKEN}" \
-  --from-literal=DT_INSECURE_SKIP_VERIFY="${DT_INSECURE_SKIP_VERIFY:-false}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 # --- 4. Collector CRs (gateway first: the DaemonSet forwards to it) ---------

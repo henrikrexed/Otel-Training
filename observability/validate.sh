@@ -42,7 +42,6 @@ fi
 # Deterministic offline env for `${env:...}` expansion inside the configs.
 export DT_TENANT="${DT_TENANT:-https://validate.invalid}"
 export DT_INGEST_TOKEN="${DT_INGEST_TOKEN:-validate-token}"
-export DT_INSECURE_SKIP_VERIFY="${DT_INSECURE_SKIP_VERIFY:-false}"
 
 validate_config() { # file, cr-name
   local file="$1" name="$2"
