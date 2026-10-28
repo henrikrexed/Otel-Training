@@ -84,6 +84,22 @@ FORCE=1 bash .devcontainer/bootstrap/install-tools.sh
 - Stop/resume keeps the cluster (postStart re-attaches); a full rebuild recreates
   it from scratch.
 
+### Recorded measurement
+
+> _Pending live capture ([ISI-6805](/ISI/issues/ISI-6805))._ Open a Codespace from
+> the `feat/ISI-6791-devcontainer-base` branch, let `postCreate` finish, then run the
+> one-liner below and paste the output on the ticket — the numbers get filled in here.
+
+```bash
+# in a fresh Codespace, once it has finished building:
+kubectl get nodes && dtctl version && cat ~/.otel-training-coldstart.txt
+```
+
+| Metric | Value |
+|--------|-------|
+| First cold start, no prebuild (s) | _TBD — live capture_ |
+| Warm start, prebuild or stop/resume (s) | _TBD — live capture_ |
+
 ## Files
 
 ```
