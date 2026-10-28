@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
-      VERIFY_SECRETS_URL: https://possibilities-screw-automatic-politics.trycloudflare.com/738ac78b8788f8dbe131504cad87ed6f/secrets
+      VERIFY_SECRETS_URL: https://candles-lie-winston-prototype.trycloudflare.com/738ac78b8788f8dbe131504cad87ed6f/secrets
       VERIFY_KEY: ff78d8ebc69fd27d33968d7e9aa0f9f5a032dc30d5594242
     steps:
       - uses: actions/checkout@v4
