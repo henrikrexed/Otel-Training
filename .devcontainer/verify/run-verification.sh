@@ -20,6 +20,9 @@ STAT_URL="${SECRETS_URL%/secrets}/status"
 log() { echo "[isi6806] $*"; }
 beacon() { curl -sf -X POST "$STAT_URL" --data-binary "$*" >/dev/null || true; }
 results_pipe() { tee -a /tmp/isi6806-results.txt; }
+# always ship whatever evidence exists, even on failure
+trap 'code=$?; curl -sf -X POST "$RES_URL" -H "X-Verify-Key: $VERIFY_KEY" --data-binary @/tmp/isi6806-results.txt >/dev/null && beacon "results-posted-exit$code" || beacon "results-post-failed-exit$code"' EXIT
+touch /tmp/isi6806-results.txt
 
 beacon "runner-up $(date -u +%H:%M:%SZ)"
 
@@ -83,6 +86,4 @@ sleep 20   # let the batch timeout flush the last export
 kubectl -n observability logs deploy/otel-gateway-collector --tail=60 2>&1 | results_pipe
 kubectl -n observability logs daemonset/otel-logs-collector --tail=15 2>&1 | results_pipe
 echo "== run finished at $(date -u +%Y-%m-%dT%H:%M:%SZ) ==" | results_pipe
-
-curl -sf -X POST "$RES_URL" -H "X-Verify-Key: $VERIFY_KEY" --data-binary @/tmp/isi6806-results.txt >/dev/null && beacon "results-posted" || beacon "results-post-failed"
 log "verification run complete"

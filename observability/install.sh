@@ -49,7 +49,10 @@ else
   log "OTel Operator already present — skipping"
 fi
 log "waiting for the OTel Operator to become ready"
-wait_rollout opentelemetry-operator-system deploy/opentelemetry-operator
+# The upstream manifest names the deployment "opentelemetry-operator-controller-manager";
+# wait on the label selector so this stays correct across operator renames.
+kubectl -n opentelemetry-operator-system rollout status deploy \
+  -l app.kubernetes.io/name=opentelemetry-operator --timeout=300s
 
 # --- 3. Namespace + Dynatrace secret (from attendee env; never in git) ------
 kubectl apply -f "${HERE}/collectors/namespace.yaml"
