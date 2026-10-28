@@ -42,15 +42,14 @@ fi
 # Deterministic offline env for `${env:...}` expansion inside the configs.
 export DT_TENANT="${DT_TENANT:-https://validate.invalid}"
 export DT_INGEST_TOKEN="${DT_INGEST_TOKEN:-validate-token}"
-export DT_INSECURE_SKIP_VERIFY="${DT_INSECURE_SKIP_VERIFY:-false}"
 
 validate_config() { # file, cr-name
   local file="$1" name="$2"
   local tmp
   tmp="$(mktemp)"
-  # The operator expands `$` itself, so CRs escape collector env refs as
-  # `$${env:FOO}`. Un-escape before raw otelcol validation.
-  "$YQ" '.spec.config' "$file" | sed 's/\$\${/${/g' > "$tmp"
+  # The operator passes spec.config through VERBATIM (ISI-6806 live finding) —
+  # validate exactly what ships; no manual `$${` un-escaping.
+  "$YQ" '.spec.config' "$file" > "$tmp"
   if "$OTELCOL" validate --config "$tmp" >/dev/null 2>"$tmp.err"; then
     log "otelcol validate OK: ${name}"
   else

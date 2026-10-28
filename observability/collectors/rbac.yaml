@@ -1,0 +1,40 @@
+# RBAC for the gateway collector's k8sattributes processor.
+#
+# Without this, the processor logs
+#   User "system:serviceaccount:observability:otel-gateway-collector" cannot
+#   list resource "pods" ... at the cluster scope
+# and enrichment degrades to whatever attributes the DaemonSet forwards
+# (found live in ISI-6806). The operator's default ServiceAccount has no
+# pod-read permissions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otel-gateway-collector-k8sattributes
+  labels:
+    app.kubernetes.io/name: otel-gateway
+    app.kubernetes.io/component: gateway-collector
+    app.kubernetes.io/part-of: otel-training
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otel-gateway-collector-k8sattributes
+  labels:
+    app.kubernetes.io/name: otel-gateway
+    app.kubernetes.io/component: gateway-collector
+    app.kubernetes.io/part-of: otel-training
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: otel-gateway-collector-k8sattributes
+subjects:
+  - kind: ServiceAccount
+    name: otel-gateway-collector
+    namespace: observability
