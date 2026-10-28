@@ -10,7 +10,7 @@
 #
 # NOTE on `$${env:...}`: the OTel Operator expands `$`-expressions itself when
 # it renders the collector config. `$${env:FOO}` escapes through to the
-# collector, which resolves the variable at runtime from `envFrom`.
+# collector, which resolves the variable at runtime from `spec.env`.
 apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
@@ -23,11 +23,23 @@ spec:
   mode: deployment
   replicas: 1
   image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.164.0
-  # Dynatrace tenant URL + OTLP ingest token come from this Secret — created by
-  # install.sh from the attendee's DT_TENANT / DT_INGEST_TOKEN env. Never committed.
-  envFrom:
-    - secretRef:
-        name: dynatrace-otel
+  # Dynatrace tenant URL + OTLP ingest token come from the dynatrace-otel
+  # Secret — created by install.sh from the attendee's DT_TENANT /
+  # DT_INGEST_TOKEN env. Never committed.
+  # NOTE (ISI-6806 live finding): use spec.env with secretKeyRef. spec.envFrom
+  # exists on the CRD but the rendered pod never received the vars with it —
+  # the exporter then failed with "endpoint must be a valid URL".
+  env:
+    - name: DT_TENANT
+      valueFrom:
+        secretKeyRef:
+          name: dynatrace-otel
+          key: DT_TENANT
+    - name: DT_INGEST_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: dynatrace-otel
+          key: DT_INGEST_TOKEN
   resources:
     requests:
       cpu: 100m

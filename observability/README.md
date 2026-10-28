@@ -92,7 +92,9 @@ Both CRs are also schema-checked against the operator's `v1beta1` CRD.
 
 - **`$${env:FOO}` escaping** — the OTel Operator expands `$`-expressions when
   rendering collector config; `$${env:FOO}` passes through to the collector,
-  which resolves it at runtime from `envFrom: secretRef: dynatrace-otel`.
+  which resolves it at runtime from the container env, injected via
+  `spec.env` + `secretKeyRef: dynatrace-otel` (`spec.envFrom` exists on the
+  CRD but did not reach the rendered pod — ISI-6806 live finding).
 - **Env expansion is stringly-typed** — `tls.insecure_skip_verify` is a bool
   field: `insecure_skip_verify: $${env:FOO}}` passes `otelcol validate` but the
   real collector crash-loops with *"expected type 'bool', got unconvertible
