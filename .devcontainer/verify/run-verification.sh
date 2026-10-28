@@ -51,6 +51,11 @@ fi
 diagnose() {
   {
     echo "== get pods -n observability =="; kubectl -n observability get pods -o wide
+    echo "== gateway deploy env (names+sources only) =="
+    kubectl -n observability get deploy otel-gateway-collector -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}{"\t value="}{.value}{"\t secret="}{.valueFrom.secretKeyRef.name}{"\n"}{end}' 2>&1
+    echo "== gateway rendered collector configmap =="
+    CM=$(kubectl -n observability get configmap -o name 2>/dev/null | grep gateway | head -1)
+    [[ -n "$CM" ]] && kubectl -n observability get "$CM" -o go-template='{{range $k,$v := .data}}--- {{$k}}{{"\n"}}{{$v}}{{end}}' 2>&1 | grep -vE "Api-Token" | head -60
     echo "== describe pods -n observability =="; kubectl -n observability describe pods 2>&1 | tail -120
     echo "== recent events =="; kubectl get events -A --sort-by=.lastTimestamp 2>&1 | tail -40
     echo "== collector pod logs (current+previous) =="
