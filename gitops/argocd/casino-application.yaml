@@ -1,0 +1,42 @@
+# Argo CD Application — the heart of the "fix a manifest and watch it deploy" lab.
+#
+# Argo CD watches the casino repo on the in-cluster Gitea host and keeps the
+# `casino` namespace in sync with it. When an attendee edits a manifest under
+# k8s/, commits, and pushes, Argo CD auto-syncs the change onto the cluster
+# within the reconcile interval (default ~3 min; the lab guide shows the
+# "Refresh / Sync" button to make it instant).
+#
+# Source of truth: ISI-6794 publishes the canonical casino manifests; this
+# Application only ever reads them from git — never apply casino manifests by
+# hand once Argo CD owns the namespace (it would get reverted by selfHeal).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: casino
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://gitea-http.gitea.svc:3000/casino/casino.git
+    targetRevision: main
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: casino
+  syncPolicy:
+    automated:
+      prune: true        # delete resources removed from git
+      selfHeal: true     # revert manual drift — git is authoritative
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

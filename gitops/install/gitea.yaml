@@ -1,0 +1,146 @@
+# Lightweight self-managed Git host for the GitOps lab (ISI-6796).
+#
+# Why Gitea and not GitLab CE:
+#   GitLab CE needs ~4 GB RAM *minimum* (8 GB recommended) for a single node.
+#   The per-attendee kind cluster lives in a 4-core / 8 GB codespace that already
+#   runs the casino app + Redis + Postgres + the OTel operator + two collectors +
+#   the Dynatrace operator. A full GitLab would not fit. Gitea gives the same
+#   attendee-facing experience (web UI, HTTP git, commits, webhooks) in ~150 MB,
+#   so the "fix a manifest and watch Argo CD deploy it" loop is identical.
+#   See gitops/README.md for the full resource-cost comparison + decision record.
+#
+# Config: SQLite (no external DB), self-contained PVC, in-cluster HTTP only
+# (TLS is terminated at the Gateway for the casino, not needed for an in-cluster
+# git host used by Argo CD). Exposed to the attendee via NodePort 30001.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea
+  labels:
+    app.kubernetes.io/part-of: otel-training-gitops
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-data
+  namespace: gitea
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-config
+  namespace: gitea
+data:
+  # Minimal app.ini. INSTALL_LOCK skips the web installer; the admin user and the
+  # casino repo are created by gitops/install/seed-gitea.sh after rollout.
+  GITEA__database__DB_TYPE: "sqlite3"
+  GITEA__database__PATH: "/data/gitea/gitea.db"
+  GITEA__server__DOMAIN: "localhost"
+  GITEA__server__HTTP_PORT: "3000"
+  # ROOT_URL uses the forwarded NodePort so links in the UI resolve from the codespace.
+  GITEA__server__ROOT_URL: "http://localhost:30001/"
+  GITEA__server__SSH_DOMAIN: "localhost"
+  GITEA__server__DISABLE_SSH: "true"
+  GITEA__security__INSTALL_LOCK: "true"
+  GITEA__service__DISABLE_REGISTRATION: "true"
+  GITEA__service__REQUIRE_SIGNIN_VIEW: "false"
+  GITEA__webhook__ALLOWED_HOST_LIST: "*"
+  GITEA__repository__DEFAULT_BRANCH: "main"
+  GITEA__log__LEVEL: "warn"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  namespace: gitea
+  labels:
+    app.kubernetes.io/name: gitea
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate          # single RWO PVC — never run two writers
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitea
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: gitea
+          image: gitea/gitea:1.22.6
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: gitea-config
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /api/healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 384Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: gitea-data
+---
+# In-cluster service Argo CD uses: http://gitea-http.gitea.svc:3000
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-http
+  namespace: gitea
+  labels:
+    app.kubernetes.io/name: gitea
+spec:
+  selector:
+    app.kubernetes.io/name: gitea
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+# NodePort so the attendee can open the Gitea UI / push over HTTP from the codespace.
+# 30001 is published by the kind control-plane node (see .devcontainer kind-config.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-nodeport
+  namespace: gitea
+  labels:
+    app.kubernetes.io/name: gitea
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: gitea
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      nodePort: 30001

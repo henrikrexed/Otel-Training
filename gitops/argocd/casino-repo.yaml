@@ -1,0 +1,21 @@
+# Tell Argo CD how to reach the in-cluster Gitea repo (ISI-6796).
+#
+# In-cluster plaintext HTTP is fine here: the git host, Argo CD, and the cluster
+# all live inside the same throwaway per-attendee kind cluster — nothing crosses
+# the codespace boundary. For a real deployment use HTTPS + a deploy token.
+#
+# Credentials match gitops/install/seed-gitea.sh defaults. If you override
+# GITEA_ADMIN_USER / GITEA_ADMIN_PASS there, update them here too (or let the
+# bootstrap script template them in).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: casino-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: git
+  url: http://gitea-http.gitea.svc:3000/casino/casino.git
+  username: attendee
+  password: trainingpass123
