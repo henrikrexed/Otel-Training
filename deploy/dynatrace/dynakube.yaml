@@ -1,0 +1,71 @@
+# DynaKube — OTel Training cluster, KUBERNETES-MONITORING mode.
+#
+# This is the config-as-code source of record for ISI-6793. It tells the
+# Dynatrace Operator to register this kind cluster for *Kubernetes monitoring*
+# (K8s API observability via an in-cluster ActiveGate) and NOTHING ELSE.
+#
+# Why no `oneAgent` section?
+#   The training drives all application telemetry (traces/metrics/logs for the
+#   Vegas Casino services) through the OpenTelemetry collectors. Enabling OneAgent
+#   cloud-native / application monitoring here would auto-inject the agent and
+#   DOUBLE-INGEST those same app signals into the tenant. Omitting `oneAgent`
+#   leaves app observability entirely to OTel and keeps Dynatrace focused on the
+#   Kubernetes layer (cluster, nodes, workloads, events) — clean coexistence,
+#   no conflict. See deploy/dynatrace/README.md §"Coexistence with OTel".
+#
+# apiUrl and the token Secret are injected at install time by install.sh from the
+# per-attendee DT_* env (devcontainer secrets) — never hard-coded here. The
+# placeholders below are replaced by `envsubst`; apply via install.sh, not raw
+# `kubectl apply`, unless you have already substituted them.
+# apiVersion pinned to the DynaKube storage version served by the operator we
+# install (1.11.x serves v1beta5 + v1beta6; v1beta6 is storage). Verified against
+# the chart's CRD — see README §"API version pin". Bump together with the operator.
+apiVersion: dynatrace.com/v1beta6
+kind: DynaKube
+metadata:
+  name: ${DYNAKUBE_NAME}
+  namespace: dynatrace
+  annotations:
+    # Let the operator create/maintain the Kubernetes API monitoring setting in the
+    # tenant automatically, so the cluster shows up under Kubernetes monitoring
+    # without a manual settings step. (Default-on in recent operators; set
+    # explicitly so behaviour is obvious and stable across versions.)
+    feature.dynatrace.com/automatic-kubernetes-api-monitoring: "true"
+spec:
+  # Tenant API endpoint, e.g. https://abc12345.live.dynatrace.com/api
+  apiUrl: ${DT_API_URL}
+
+  # Name of the Secret (same namespace) holding `apiToken` and `dataIngestToken`.
+  # Created by install.sh from DT_API_TOKEN / DT_INGEST_TOKEN. By convention the
+  # operator looks for a Secret named after the DynaKube when `tokens` is unset;
+  # we set it explicitly for clarity.
+  tokens: ${DYNAKUBE_NAME}
+
+  # Give every monitored entity a stable, per-attendee cluster label so the shared
+  # tenant stays readable when many attendees connect at once.
+  networkZone: ${DYNAKUBE_NAME}
+
+  # --- Kubernetes monitoring via an in-cluster ActiveGate -------------------
+  # The `kubernetes-monitoring` capability is what registers this cluster for
+  # Kubernetes observability. `routing` + `dynatrace-api` let in-cluster
+  # components reach the tenant through the ActiveGate if needed; they are cheap
+  # and make the single AG self-sufficient on an air-gapped-ish kind network.
+  activeGate:
+    capabilities:
+      - kubernetes-monitoring
+      - routing
+      - dynatrace-api
+    # One replica is plenty for a single-node training cluster.
+    replicas: 1
+    # Keep the ActiveGate inside a 4-core / 8 GB codespace budget.
+    resources:
+      requests:
+        cpu: 150m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1.5Gi
+    # kind's single node is a control-plane node (schedulable); no custom
+    # tolerations needed. Add nodeSelector/tolerations here for multi-node.
+
+  # NOTE: intentionally NO `oneAgent:` block. See header comment.
