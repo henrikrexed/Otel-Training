@@ -1,0 +1,36 @@
+# kind cluster for the OTel training codespace.
+#
+# Single control-plane node (which also schedules workloads) to fit a 4-core /
+# 8 GB codespace while still running the Vegas Casino app + collectors + the
+# Dynatrace operator. For beefier machines, add `- role: worker` entries.
+#
+# The control-plane node publishes 80/443 (Gateway API / ingress — ISI-6795) and
+# a small NodePort band so attendees can reach services from the codespace.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    # Pin the node image for reproducibility; bump alongside KIND_VERSION.
+    image: kindest/node:v1.31.2
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+      - containerPort: 30000
+        hostPort: 30000
+        protocol: TCP
+      - containerPort: 30001
+        hostPort: 30001
+        protocol: TCP
+      - containerPort: 30002
+        hostPort: 30002
+        protocol: TCP

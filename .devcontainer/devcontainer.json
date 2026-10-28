@@ -1,0 +1,74 @@
+{
+  "name": "OTel Training — Perform Hotday (base)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "args": {
+      "KUBECTL_VERSION": "${localEnv:KUBECTL_VERSION:v1.31.2}",
+      "HELM_VERSION": "${localEnv:HELM_VERSION:v3.16.4}",
+      "KIND_VERSION": "${localEnv:KIND_VERSION:v0.25.0}",
+      "ARGOCD_VERSION": "${localEnv:ARGOCD_VERSION:v2.13.2}",
+      "YQ_VERSION": "${localEnv:YQ_VERSION:v4.44.6}",
+      "DTCTL_VERSION": "${localEnv:DTCTL_VERSION:latest}"
+    }
+  },
+
+  // Docker-in-Docker is required so `kind` can run a Kubernetes cluster inside
+  // the codespace. This also pulls in a modern Docker + buildx.
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": false,
+      "username": "vscode"
+    }
+  },
+
+  // One kind cluster per attendee. The control-plane node publishes 80/443 and a
+  // NodePort range to the codespace so Gateway API / ingress work (ISI-6795).
+  "forwardPorts": [80, 443, 8080, 30000, 30001, 30002],
+  "portsAttributes": {
+    "80": { "label": "cluster-http" },
+    "443": { "label": "cluster-https" },
+    "8080": { "label": "app/argocd" }
+  },
+
+  // Bootstrap runs once at create time (installs nothing extra — tools are baked
+  // into the image — then stands up the kind cluster and records cold-start time).
+  "onCreateCommand": "bash .devcontainer/bootstrap/postCreate.sh",
+  // postStart re-ensures the cluster is healthy after a codespace stop/resume.
+  "postStartCommand": "bash .devcontainer/bootstrap/postStart.sh",
+
+  // Tenant connection is injected per attendee — NEVER baked into the image.
+  // See .devcontainer/.env.example and .devcontainer/README.md for the full list.
+  // In GitHub Codespaces set these as Codespaces/Repository secrets.
+  "remoteEnv": {
+    "DT_TENANT": "${localEnv:DT_TENANT}",
+    "DT_API_TOKEN": "${localEnv:DT_API_TOKEN}",
+    "DT_INGEST_TOKEN": "${localEnv:DT_INGEST_TOKEN}",
+    "KUBECONFIG": "/home/vscode/.kube/config",
+    "KIND_CLUSTER_NAME": "${localEnv:KIND_CLUSTER_NAME:otel-training}"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "redhat.vscode-yaml",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+
+  "remoteUser": "vscode",
+  // kind + the casino + collectors + operators need headroom. Request a 4-core
+  // machine for codespaces that support hostRequirements.
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  }
+}
