@@ -41,6 +41,7 @@ observability/
 ├── validate.sh               # offline validation (otelcol validate + order contract)
 └── collectors/
     ├── namespace.yaml        # observability namespace
+    ├── rbac.yaml             # ClusterRole/Binding for gateway k8sattributes
     ├── gateway.yaml          # OpenTelemetryCollector (deployment) → Dynatrace
     └── daemonset.yaml        # OpenTelemetryCollector (daemonset) → gateway
 ```

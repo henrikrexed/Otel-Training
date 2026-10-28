@@ -62,12 +62,16 @@ kubectl -n observability create secret generic dynatrace-otel \
   --from-literal=DT_INGEST_TOKEN="${DT_INGEST_TOKEN}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
-# --- 4. Collector CRs (gateway first: the DaemonSet forwards to it) ---------
+# --- 4. Gateway k8sattributes RBAC (pod/namespace read for enrichment) -------
+log "applying gateway collector RBAC"
+kubectl apply -f "${HERE}/collectors/rbac.yaml"
+
+# --- 5. Collector CRs (gateway first: the DaemonSet forwards to it) ---------
 log "applying collector CRs"
 kubectl apply -f "${HERE}/collectors/gateway.yaml"
 kubectl apply -f "${HERE}/collectors/daemonset.yaml"
 
-# --- 5. Health ---------------------------------------------------------------
+# --- 6. Health ---------------------------------------------------------------
 log "waiting for gateway deployment"
 wait_rollout observability deploy/otel-gateway-collector
 log "waiting for logs DaemonSet"
