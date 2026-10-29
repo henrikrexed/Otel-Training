@@ -5,22 +5,24 @@
 
 const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
-const { Resource } = require('@opentelemetry/resources');
-const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
-const { OTLPTraceExporter } = require('@opentelemetry/exporter-otlp-grpc');
+const { resourceFromAttributes } = require('@opentelemetry/resources');
+const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-grpc');
 const { trace, propagation } = require('@opentelemetry/api');
 const { W3CTraceContextPropagator } = require('@opentelemetry/core');
 
 // Initialize OpenTelemetry SDK
 function initializeTelemetry(serviceName, serviceMetadata = {}) {
-  const resource = new Resource({
-    [SemanticResourceAttributes.SERVICE_NAME]: serviceName,
-    [SemanticResourceAttributes.SERVICE_NAMESPACE]: process.env.SERVICE_NAMESPACE || 'vegas-casino',
-    [SemanticResourceAttributes.SERVICE_VERSION]: serviceMetadata.version || process.env.SERVICE_VERSION || '2.1.0',
-    [SemanticResourceAttributes.SERVICE_INSTANCE_ID]: process.env.SERVICE_INSTANCE_ID || `${serviceName}-${process.pid}`,
-    [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: process.env.DEPLOYMENT_ENVIRONMENT || 'production',
-    [SemanticResourceAttributes.CLOUD_PROVIDER]: process.env.CLOUD_PROVIDER || 'unknown',
-    [SemanticResourceAttributes.CLOUD_REGION]: process.env.CLOUD_REGION || 'unknown',
+  // Use semantic-convention attribute *keys* as string literals so this stays
+  // stable across semantic-conventions releases (several consts moved to the
+  // /incubating entry point and `new Resource()` was removed in resources@2+).
+  const resource = resourceFromAttributes({
+    'service.name': serviceName,
+    'service.namespace': process.env.SERVICE_NAMESPACE || 'vegas-casino',
+    'service.version': serviceMetadata.version || process.env.SERVICE_VERSION || '2.1.0',
+    'service.instance.id': process.env.SERVICE_INSTANCE_ID || `${serviceName}-${process.pid}`,
+    'deployment.environment.name': process.env.DEPLOYMENT_ENVIRONMENT || 'production',
+    'cloud.provider': process.env.CLOUD_PROVIDER || 'unknown',
+    'cloud.region': process.env.CLOUD_REGION || 'unknown',
     // Custom game attributes
     'game.category': serviceMetadata.gameCategory || process.env.GAME_CATEGORY || 'unknown',
     'game.type': serviceMetadata.gameType || process.env.GAME_TYPE || 'unknown',

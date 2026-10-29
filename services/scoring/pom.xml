@@ -8,7 +8,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.0</version>
+        <version>3.5.3</version>
         <relativePath/>
     </parent>
 
@@ -23,7 +23,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <opentelemetry.version>1.31.0</opentelemetry.version>
+        <opentelemetry.version>1.51.0</opentelemetry.version>
     </properties>
 
     <dependencyManagement>
@@ -74,7 +74,7 @@
         <dependency>
             <groupId>io.opentelemetry.semconv</groupId>
             <artifactId>opentelemetry-semconv</artifactId>
-            <version>1.25.0-alpha</version>
+            <version>1.32.0</version>
         </dependency>
         <dependency>
             <groupId>io.opentelemetry</groupId>

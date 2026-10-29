@@ -8,8 +8,8 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "@playwright/test": "^1.57.0",
-    "playwright": "^1.57.0"
+    "@playwright/test": "^1.64.1",
+    "playwright": "^1.64.1"
   },
   "keywords": [
     "playwright",
@@ -20,4 +20,3 @@
   "author": "Vegas Casino Team",
   "license": "MIT"
 }
-
