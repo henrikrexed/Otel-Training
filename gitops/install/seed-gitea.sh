@@ -3,9 +3,9 @@
 # the canonical casino manifests so Argo CD has something to sync (ISI-6796).
 #
 # Single source of truth: the manifests pushed here come from the casino app-deploy
-# ticket (ISI-6794). Point CASINO_MANIFESTS_DIR at whatever directory ISI-6794
-# publishes; until that lands we seed the placeholder in gitops/seed/k8s so the
-# whole GitOps loop is demonstrable today. Re-running is safe (idempotent).
+# ticket (ISI-6794), published to deploy/casino/k8s (the default below). Override
+# CASINO_MANIFESTS_DIR to seed a different directory (e.g. gitops/seed/k8s for the
+# original replicas-only placeholder demo). Re-running is safe (idempotent).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,7 +18,7 @@ GITEA_ADMIN_PASS="${GITEA_ADMIN_PASS:-trainingpass123}"
 GITEA_ADMIN_EMAIL="${GITEA_ADMIN_EMAIL:-attendee@otel.training}"
 CASINO_ORG="${CASINO_ORG:-casino}"
 CASINO_REPO="${CASINO_REPO:-casino}"
-CASINO_MANIFESTS_DIR="${CASINO_MANIFESTS_DIR:-$REPO_ROOT/gitops/seed/k8s}"
+CASINO_MANIFESTS_DIR="${CASINO_MANIFESTS_DIR:-$REPO_ROOT/deploy/casino/k8s}"
 KUBECTL="${KUBECTL:-kubectl}"
 
 log() { echo "==> $*"; }

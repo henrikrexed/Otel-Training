@@ -1,0 +1,156 @@
+# Dice game service (Go). http 8083 / gRPC 50053.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vegas-casino-dice
+  labels:
+    app.kubernetes.io/name: vegas-casino
+    app.kubernetes.io/instance: vegas-casino
+    app.kubernetes.io/part-of: casino
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: dice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vegas-casino
+      app.kubernetes.io/instance: vegas-casino
+      app.kubernetes.io/component: dice
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vegas-casino
+        app.kubernetes.io/instance: vegas-casino
+        app.kubernetes.io/component: dice
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+        prometheus.io/path: "/health"
+    spec:
+      securityContext:
+        fsGroup: 2000
+        runAsNonRoot: true
+        runAsUser: 1000
+      serviceAccountName: vegas-casino
+      containers:
+        - name: dice-service
+          securityContext:
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+          image: "ghcr.io/henrikrexed/vegasapp-dice:0.39"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
+            - name: grpc
+              containerPort: 50053
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8083"
+            - name: GRPC_PORT
+              value: "50053"
+            - name: SERVICE_NAME
+              value: "vegas-dice-service"
+            - name: OTEL_SERVICE_NAME
+              value: "vegas-dice-service"
+            - name: OTEL_SERVICE_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: vegas-casino-config
+                  key: OTEL_SERVICE_VERSION
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=vegas-dice-service,service.version=2.1.0,service.namespace=vegas-casino,deployment.environment=production,application.name=Vegas-Casino-dice-games,game.category=dice-games,game.complexity=medium,game.max_payout=2x,game.type=craps-dice,game.owner=Dice-Games-Division"
+            - name: DEPLOYMENT_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: vegas-casino-config
+                  key: DEPLOYMENT_ENVIRONMENT
+            - name: SERVICE_NAMESPACE
+              valueFrom:
+                configMapKeyRef:
+                  name: vegas-casino-config
+                  key: SERVICE_NAMESPACE
+            - name: K8S_CLUSTER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: vegas-casino-config
+                  key: K8S_CLUSTER_NAME
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SERVICE_INSTANCE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-gateway-collector.observability.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: "true"
+            - name: REDIS_HOST
+              value: "vegas-casino-redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: SCORING_SERVICE_URL
+              value: "http://vegas-casino-scoring:8085"
+            - name: GAME_CATEGORY
+              value: "dice-games"
+            - name: GAME_COMPLEXITY
+              value: "medium"
+            - name: GAME_MAX_PAYOUT
+              value: "2x"
+            - name: GAME_TYPE
+              value: "craps-dice"
+            - name: GAME_OWNER
+              value: "Dice-Games-Division"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vegas-casino-dice
+  labels:
+    app.kubernetes.io/name: vegas-casino
+    app.kubernetes.io/instance: vegas-casino
+    app.kubernetes.io/part-of: casino
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: dice
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8083
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 50053
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+  selector:
+    app.kubernetes.io/name: vegas-casino
+    app.kubernetes.io/instance: vegas-casino
+    app.kubernetes.io/component: dice

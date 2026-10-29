@@ -1,10 +1,13 @@
-# PLACEHOLDER casino manifest — REPLACE with the real manifests from ISI-6794.
+# PLACEHOLDER casino manifest — SUPERSEDED by the real manifests from ISI-6794.
+#
+# ISI-6794 has landed: the canonical casino manifests now live in
+# deploy/casino/k8s and are the default CASINO_MANIFESTS_DIR in
+# gitops/install/seed-gitea.sh. This file is retained only as a fallback /
+# minimal demo — seed it with `CASINO_MANIFESTS_DIR=gitops/seed/k8s` if you want
+# the original single-knob (replicas) GitOps loop without the full app.
 #
 # This exists so the GitOps plumbing (Gitea -> Argo CD -> cluster) is healthy,
-# synced, and demonstrable before the casino app-deploy ticket (ISI-6794) lands.
-# Once ISI-6794 publishes the canonical casino manifests, point
-# CASINO_MANIFESTS_DIR (gitops/install/seed-gitea.sh) at that directory and the
-# next seed pushes the real app in place of this.
+# synced, and demonstrable with a trivial workload.
 #
 # It is intentionally tiny and has one obvious knob — `replicas` — so the lab can
 # demo the loop immediately: edit replicas 1 -> 3, commit, push, watch Argo CD

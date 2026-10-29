@@ -59,11 +59,15 @@ the CLI baked into the devcontainer image.
 The casino app-deploy ticket (**ISI-6794**) owns the canonical Kubernetes
 manifests. This GitOps path **consumes** them — it never defines the app:
 
-- ISI-6794 publishes the casino manifests to a version-controlled directory.
+- ISI-6794 publishes the casino manifests to **`deploy/casino/k8s`** (plain,
+  version-controlled YAML — no Helm/Kustomize, so Argo CD's directory source
+  applies them verbatim and attendees edit a file they can read end-to-end).
 - `gitops/install/seed-gitea.sh` pushes that directory into the attendee's Gitea
-  repo under `k8s/`. Point it with `CASINO_MANIFESTS_DIR=<path>`.
-- Until ISI-6794 lands, the seed uses `gitops/seed/k8s/placeholder.yaml` so the
-  whole loop is already demonstrable (edit `replicas`, commit, watch it scale).
+  repo under `k8s/`. It is the **default** `CASINO_MANIFESTS_DIR` now that
+  ISI-6794 has landed; override the env to seed a different directory.
+- `gitops/seed/k8s/placeholder.yaml` remains as a minimal fallback — seed with
+  `CASINO_MANIFESTS_DIR=gitops/seed/k8s` for the original single-knob
+  (edit `replicas`, commit, watch it scale) demo without the full app.
 
 Once Argo CD owns the `casino` namespace, **do not** `kubectl apply` casino
 manifests by hand — `selfHeal` reverts drift. Git is authoritative.
