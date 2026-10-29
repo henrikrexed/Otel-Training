@@ -64,3 +64,5 @@ SECURITY_CLEANUP_GUIDE.md
 cleanup-terraform-state.sh
 push-and-create-pr.sh
 remove-sensitive-files-from-history.sh
+# Generated gRPC/proto Go stubs (produced at Docker build time)
+services/dice/go/proto/

@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
@@ -8,8 +8,8 @@ RUN apk add --no-cache protobuf protoc git
 
 # Install protoc-gen-go and protoc-gen-go-grpc via go install
 ENV PATH=$PATH:/root/go/bin
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0 && \
-    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12 && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
 
 # Copy go mod files first
 COPY services/dice/go/go.mod ./
@@ -35,7 +35,7 @@ RUN mkdir -p proto && \
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dice-service-grpc dice-service-grpc.go opentelemetry.go featureflags.go scoring.go redis.go
 
 # Runtime stage
-FROM alpine:latest
+FROM alpine:3.21
 
 RUN apk --no-cache add ca-certificates
 
