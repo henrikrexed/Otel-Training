@@ -1,0 +1,194 @@
+# Composed end-state gateway for the ADVANCED track (ISI-6928).
+#
+# This is observability/collectors/gateway.yaml (the canonical known-good baseline) with
+# every advanced-track collector fix wired in, in the correct per-signal order:
+#   Step 3  resource/costcenter      — dt.cost.* on all signals
+#   Step 4  transform/cardinality    — metrics: drop unbounded dims from casino.payout.total
+#   Step 5  redaction + transform/pii — logs: mask email / PAN / SSN
+#   Step 6  tail_sampling            — traces: keep errors/slow/jackpots, sample rest 10%
+#
+# Invariants (critical rules): memory_limiter FIRST, batch LAST, k8sattributes (Kubernetes).
+# Attendees reach this incrementally; facilitators can apply it directly.
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-gateway
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: otel-gateway
+    app.kubernetes.io/component: gateway-collector
+spec:
+  mode: deployment
+  replicas: 1                     # required for tail_sampling (see step6 README)
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.164.0
+  env:
+    - name: DT_TENANT
+      valueFrom:
+        secretKeyRef:
+          name: dynatrace-otel
+          key: DT_TENANT
+    - name: DT_INGEST_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: dynatrace-otel
+          key: DT_INGEST_TOKEN
+    # Step 3 — cost allocation (per team/product; override per attendee).
+    - name: COST_CENTER
+      value: casino-platform-training
+    - name: COST_PRODUCT
+      value: vegas-casino
+  resources:
+    requests:
+      cpu: 150m
+      memory: 384Mi
+    limits:
+      memory: 768Mi              # raised: tail_sampling buffers traces in memory
+  config:
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      # --- invariant: first ---
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 600
+        spike_limit_mib: 150
+      # --- enrichment (Kubernetes) ---
+      k8sattributes:
+        extract:
+          metadata:
+            - k8s.namespace.name
+            - k8s.pod.name
+            - k8s.pod.uid
+            - k8s.pod.start_time
+            - k8s.deployment.name
+            - k8s.replicaset.name
+            - k8s.node.name
+            - k8s.container.name
+            - container.image.name
+            - container.image.tag
+          labels:
+            - tag_name: k8s.app.label.name
+              key: app.kubernetes.io/name
+              from: pod
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.name
+              - from: resource_attribute
+                name: k8s.namespace.name
+          - sources:
+              - from: connection
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.ip
+      # --- Step 3: cost-center (all signals) ---
+      resource/costcenter:
+        attributes:
+          - key: dt.cost.costcenter
+            value: ${env:COST_CENTER}
+            action: upsert
+          - key: dt.cost.product
+            value: ${env:COST_PRODUCT}
+            action: upsert
+      # --- Step 4: high-cardinality fix (metrics only) ---
+      transform/cardinality:
+        error_mode: ignore
+        metric_statements:
+          - context: datapoint
+            conditions:
+              - metric.name == "casino.payout.total"
+            statements:
+              - delete_key(attributes, "round.id")
+              - delete_key(attributes, "player.id")
+      # --- Step 5: PII redaction (logs only) ---
+      redaction:
+        allow_all_keys: true
+        blocked_values:
+          - '[\w.+-]+@[\w-]+\.[\w.-]+'
+          - '\b(?:\d[ -]*?){13,19}\b'
+          - '\b\d{3}-\d{2}-\d{4}\b'
+        summary: debug
+      transform/pii:
+        error_mode: ignore
+        log_statements:
+          - context: log
+            statements:
+              - replace_pattern(body, "[\\w.+-]+@[\\w-]+\\.[\\w.-]+", "***EMAIL_REDACTED***")
+              - replace_pattern(body, "\\b(?:\\d[ -]*?){13,19}\\b", "***PAN_REDACTED***")
+              - replace_pattern(body, "\\b\\d{3}-\\d{2}-\\d{4}\\b", "***SSN_REDACTED***")
+      # --- Step 6: tail sampling (traces only) ---
+      tail_sampling:
+        decision_wait: 10s
+        num_traces: 50000
+        expected_new_traces_per_sec: 200
+        policies:
+          - name: errors
+            type: status_code
+            status_code:
+              status_codes: [ERROR]
+          - name: slow
+            type: latency
+            latency:
+              threshold_ms: 1000
+          - name: jackpots
+            type: string_attribute
+            string_attribute:
+              key: casino.outcome
+              values: [jackpot]
+          - name: baseline
+            type: probabilistic
+            probabilistic:
+              sampling_percentage: 10
+      # --- metrics temporality (unchanged from baseline) ---
+      cumulativetodelta: {}
+      # --- invariant: last ---
+      batch:
+        timeout: 5s
+        send_batch_size: 512
+        send_batch_max_size: 1024
+
+    exporters:
+      otlphttp/dynatrace:
+        endpoint: ${env:DT_TENANT}/api/v2/otlp
+        headers:
+          Authorization: "Api-Token ${env:DT_INGEST_TOKEN}"
+        tls:
+          insecure_skip_verify: false
+        retry_on_failure:
+          enabled: true
+          initial_interval: 1s
+          max_interval: 30s
+        sending_queue:
+          enabled: true
+          num_consumers: 4
+          queue_size: 512
+
+    service:
+      extensions:
+        - health_check
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, resource/costcenter, tail_sampling, batch]
+          exporters: [otlphttp/dynatrace]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, resource/costcenter, transform/cardinality, cumulativetodelta, batch]
+          exporters: [otlphttp/dynatrace]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, k8sattributes, resource/costcenter, redaction, transform/pii, batch]
+          exporters: [otlphttp/dynatrace]
+      telemetry:
+        logs:
+          level: info

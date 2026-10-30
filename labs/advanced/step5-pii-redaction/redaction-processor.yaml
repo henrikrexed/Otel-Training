@@ -1,0 +1,36 @@
+# Step 5 patch — collector-side PII redaction for logs.
+#
+# Casino logs leak player PII into the log body and attributes: email, primary account
+# number (PAN / credit card), and SSN. Two processors clean it at the gateway BEFORE export
+# to Dynatrace:
+#
+#   1. redaction            — masks PII that lands in log ATTRIBUTES (structured fields).
+#   2. transform/pii        — masks PII embedded in the free-text log BODY via regex.
+#
+# Wire into the logs pipeline only, after k8sattributes/resource, before batch. Composed
+# result: labs/advanced/gateway-advanced.yaml.
+
+processors:
+  # 1. Attribute-level: allow all keys through, but mask any attribute VALUE matching a PII
+  #    pattern. summary: debug surfaces a redaction count in the collector's own telemetry.
+  redaction:
+    allow_all_keys: true
+    blocked_values:
+      - '[\w.+-]+@[\w-]+\.[\w.-]+'                              # email
+      - '\b(?:\d[ -]*?){13,19}\b'                               # PAN / credit card (13–19 digits)
+      - '\b\d{3}-\d{2}-\d{4}\b'                                 # US SSN
+    summary: debug
+
+  # 2. Body-level: the message string itself. redaction only sees attributes, so free-text
+  #    bodies need replace_pattern. Order the PAN rule before generic digit runs.
+  transform/pii:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - replace_pattern(body, "[\\w.+-]+@[\\w-]+\\.[\\w.-]+", "***EMAIL_REDACTED***")
+          - replace_pattern(body, "\\b(?:\\d[ -]*?){13,19}\\b", "***PAN_REDACTED***")
+          - replace_pattern(body, "\\b\\d{3}-\\d{2}-\\d{4}\\b", "***SSN_REDACTED***")
+
+# Pipeline wiring (logs pipeline only):
+#   logs: [memory_limiter, k8sattributes, resource/costcenter, redaction, transform/pii, batch]

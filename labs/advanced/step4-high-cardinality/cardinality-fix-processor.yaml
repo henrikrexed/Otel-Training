@@ -1,0 +1,36 @@
+# Step 4 patch — collector-side high-cardinality fix.
+#
+# Drop the unbounded dimensions (round.id, player.id) from casino.payout.total at the
+# gateway. The `transform` processor re-aggregates the series down to the bounded
+# game.name × outcome shape. Datapoints that differ only by the deleted keys are summed by
+# the collector's metrics aggregation on export.
+#
+# Merge this `transform/cardinality` processor into the metrics pipeline only, AFTER
+# k8sattributes/resource and BEFORE cumulativetodelta + batch. Composed result:
+# labs/advanced/gateway-advanced.yaml.
+
+processors:
+  transform/cardinality:
+    error_mode: ignore
+    metric_statements:
+      - context: datapoint
+        conditions:
+          - metric.name == "casino.payout.total"
+        statements:
+          # Strip the two unbounded labels. After deletion, datapoints collapse onto the
+          # bounded (game.name, outcome) key set.
+          - delete_key(attributes, "round.id")
+          - delete_key(attributes, "player.id")
+
+# Pipeline wiring (metrics pipeline only):
+#   metrics: [memory_limiter, k8sattributes, resource/costcenter, transform/cardinality, cumulativetodelta, batch]
+#
+# Alternative (equivalent) with the metricstransform processor — aggregate instead of delete:
+#   metricstransform:
+#     transforms:
+#       - include: casino.payout.total
+#         action: update
+#         operations:
+#           - action: aggregate_labels
+#             label_set: [casino.game.name, casino.outcome]
+#             aggregation_type: sum

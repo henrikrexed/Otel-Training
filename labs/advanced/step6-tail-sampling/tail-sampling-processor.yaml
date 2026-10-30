@@ -1,0 +1,45 @@
+# Step 6 patch — tail-based sampling at the gateway.
+#
+# Head sampling (SDK-side) decides before it knows if a trace is interesting. Tail sampling
+# decides AFTER the full trace is buffered, so we can KEEP every error and every slow trace
+# while sampling the boring, fast, successful majority down. The casino keeps 100% of money
+# losses and latency outliers, 10% of the rest.
+#
+# IMPORTANT — single-instance requirement: tail_sampling must see ALL spans of a trace on
+# one collector instance. The training gateway runs replicas: 1, so this holds. If you
+# scale the gateway, you MUST front it with a loadbalancing exporter tier keyed on traceID,
+# or decisions will be made on partial traces.
+#
+# Wire into the TRACES pipeline only, after k8sattributes/resource, before batch. Composed
+# result: labs/advanced/gateway-advanced.yaml.
+
+processors:
+  tail_sampling:
+    decision_wait: 10s          # buffer window to assemble a trace before deciding
+    num_traces: 50000
+    expected_new_traces_per_sec: 200
+    policies:
+      # 1. Keep everything that errored.
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      # 2. Keep slow traces (> 1s end-to-end).
+      - name: slow
+        type: latency
+        latency:
+          threshold_ms: 1000
+      # 3. Keep all jackpots — rare, high-value, always worth the full trace.
+      - name: jackpots
+        type: string_attribute
+        string_attribute:
+          key: casino.outcome
+          values: [jackpot]
+      # 4. Everything else: probabilistic 10%.
+      - name: baseline
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+
+# Pipeline wiring (traces pipeline only):
+#   traces: [memory_limiter, k8sattributes, resource/costcenter, tail_sampling, batch]

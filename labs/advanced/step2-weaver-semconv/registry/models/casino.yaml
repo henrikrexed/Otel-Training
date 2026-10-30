@@ -1,0 +1,80 @@
+# Casino domain attributes + span/metric groups.
+# OpenTelemetry Weaver semantic-convention model (registry group schema).
+groups:
+  # ----- Attribute registry: the single source of truth for every casino.* key -----
+  - id: registry.casino
+    type: attribute_group
+    brief: Attributes describing Vegas Casino game plays and payouts.
+    attributes:
+      - id: casino.game.name
+        type:
+          allow_custom_values: false
+          members:
+            - id: slots
+              value: "slots"
+              brief: Slot machine.
+            - id: roulette
+              value: "roulette"
+              brief: Roulette table.
+            - id: dice
+              value: "dice"
+              brief: Dice (craps) table.
+            - id: blackjack
+              value: "blackjack"
+              brief: Blackjack table.
+        stability: stable
+        brief: The casino game the play belongs to.
+        examples: ["slots", "blackjack"]
+      - id: casino.bet.amount
+        type: double
+        stability: stable
+        brief: The wagered amount in minor currency units (chips).
+        examples: [5, 100.0]
+      - id: casino.outcome
+        type:
+          allow_custom_values: false
+          members:
+            - id: win
+              value: "win"
+            - id: lose
+              value: "lose"
+            - id: jackpot
+              value: "jackpot"
+        stability: stable
+        brief: The settled result of the play.
+        examples: ["win", "jackpot"]
+      - id: casino.payout.amount
+        type: double
+        stability: stable
+        brief: The amount paid out to the player (0 on a loss).
+        examples: [0, 250.0]
+
+  # ----- Span convention: what a game-play span MUST carry -----
+  - id: span.casino.play
+    type: span
+    span_kind: internal
+    brief: A single casino game play (the money-path span Step 1 adds).
+    attributes:
+      - ref: casino.game.name
+        requirement_level: required
+      - ref: casino.bet.amount
+        requirement_level: required
+      - ref: casino.outcome
+        requirement_level: required
+      - ref: casino.payout.amount
+        requirement_level:
+          conditionally_required: when the play is settled
+
+  # ----- Metric convention: the payout counter guarded against high cardinality -----
+  - id: metric.casino.payout
+    type: metric
+    metric_name: casino.payout.total
+    brief: Total payout, dimensioned ONLY by game + outcome (never by round/player id).
+    instrument: counter
+    unit: "{chip}"
+    stability: stable
+    attributes:
+      - ref: casino.game.name
+        requirement_level: required
+      - ref: casino.outcome
+        requirement_level: required

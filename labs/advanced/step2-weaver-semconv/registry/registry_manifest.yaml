@@ -1,0 +1,10 @@
+# Weaver registry manifest for the Vegas Casino custom semantic conventions.
+# Validated with:  weaver registry check -r labs/advanced/step2-weaver-semconv/registry
+#
+# This registry defines the casino.* attributes that Step 1 introduces. The CI check
+# (ci/weaver-check.yml) fails the build if a code change drifts from these conventions —
+# e.g. renaming casino.bet.amount to casino.betAmount, or dropping a required attribute.
+name: casino
+description: Vegas Casino custom semantic conventions (training)
+semconv_version: 0.1.0
+schema_base_url: https://isitobservable.io/schemas/casino/

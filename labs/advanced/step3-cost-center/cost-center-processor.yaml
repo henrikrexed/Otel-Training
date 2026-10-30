@@ -1,0 +1,31 @@
+# Step 3 patch — inject the Dynatrace cost-allocation attributes at the gateway.
+#
+# Dynatrace Cost Allocation recognizes the resource attributes `dt.cost.costcenter` and
+# `dt.cost.product`. Stamping them on the gateway (one place) means EVERY signal — traces,
+# metrics, logs — is attributable to a cost center without touching any app. Values come
+# from the collector container env so each attendee/team can set their own.
+#
+# Merge this `resource/costcenter` processor into observability/collectors/gateway.yaml and
+# add it to every pipeline right after k8sattributes (enrichment stays together, before
+# batch). The fully merged result is labs/advanced/gateway-advanced.yaml.
+
+processors:
+  resource/costcenter:
+    attributes:
+      - key: dt.cost.costcenter
+        value: ${env:COST_CENTER}        # e.g. "casino-platform-training"
+        action: upsert
+      - key: dt.cost.product
+        value: ${env:COST_PRODUCT}       # e.g. "vegas-casino"
+        action: upsert
+
+# Pipeline wiring (add resource/costcenter after k8sattributes in each pipeline):
+#   traces:  [memory_limiter, k8sattributes, resource/costcenter, batch]
+#   metrics: [memory_limiter, k8sattributes, resource/costcenter, cumulativetodelta, batch]
+#   logs:    [memory_limiter, k8sattributes, resource/costcenter, batch]
+#
+# And add the env vars to the collector CR spec.env:
+#   - name: COST_CENTER
+#     value: casino-platform-training
+#   - name: COST_PRODUCT
+#     value: vegas-casino

@@ -1,0 +1,41 @@
+# Step 5 escalation — OTel Operator OpAMP bridge → BindPlane OP.
+#
+# Hand-maintaining regex redaction across many services gets unwieldy fast (new PII shapes,
+# per-service exceptions, audit trail). BindPlane OP manages collector config centrally and
+# ships curated PII/"Mask Sensitive Data" processors; the OTel Operator's OpAMP bridge
+# connects the cluster's operator-managed collectors to BindPlane over OpAMP so config is
+# pushed remotely — no more editing YAML by hand.
+#
+# Prereq: BindPlane OP reachable at its OpAMP endpoint (see README.md). The operator
+# (v0.162.0) ships the OpAMPBridge CRD.
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpAMPBridge
+metadata:
+  name: casino-opamp-bridge
+  namespace: observability
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-operator/operator-opamp-bridge:0.127.0
+  # BindPlane OP's OpAMP server (ws/wss). Host via the bindplane Service or an ingress.
+  endpoint: ws://bindplane.observability.svc.cluster.local:3001/v1/opamp
+  headers:
+    # BindPlane connection secret (API key / bearer), sourced from a K8s Secret in prod.
+    Authorization: ${env:BINDPLANE_OPAMP_TOKEN}
+  # Report the operator-managed collectors up to BindPlane and accept remote config.
+  capabilities:
+    AcceptsRemoteConfig: true
+    ReportsEffectiveConfig: true
+    ReportsOwnTraces: true
+    ReportsOwnMetrics: true
+    ReportsOwnLogs: true
+    ReportsHealth: true
+    ReportsRemoteConfig: true
+  componentsAllowed:
+    receivers:
+      - otlp
+    processors:
+      - redaction
+      - transform
+      - memory_limiter
+      - batch
+    exporters:
+      - otlphttp
