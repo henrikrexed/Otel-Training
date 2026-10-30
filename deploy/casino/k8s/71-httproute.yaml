@@ -1,0 +1,33 @@
+# HTTPRoute for the casino (ISI-6795) — routes everything arriving on the
+# `casino` Gateway's :80 listener to the frontend Service.
+#
+# The frontend (vegas-casino-frontend:3000) is the single web entry point and
+# the root of the distributed trace, so a catch-all `/` prefix is exactly right:
+# the Node.js app serves the UI and fans out to the game/scoring/dashboard
+# services internally. Attendees hit one URL and the whole app lights up.
+#
+# Same namespace as the Gateway and the backend Service, so this attaches with
+# no ReferenceGrant. Argo CD owns it (casino app) — change the backend or add
+# path rules, commit, and watch it sync.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: casino
+  labels:
+    app.kubernetes.io/name: vegas-casino
+    app.kubernetes.io/instance: vegas-casino
+    app.kubernetes.io/part-of: casino
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: frontend
+spec:
+  parentRefs:
+    - name: casino
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: vegas-casino-frontend
+          port: 3000

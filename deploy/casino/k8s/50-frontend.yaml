@@ -4,10 +4,14 @@
 #
 # Reach it in-cluster via the ClusterIP Service below; for a human, port-forward:
 #   kubectl -n casino port-forward svc/vegas-casino-frontend 3000:3000
-# then open http://localhost:3000.  (Gateway API/HTTPRoute is intentionally left
-# out — it would add a kgateway CRD dependency the training cluster does not
-# install. The frontend is reachable in-cluster via its Service, satisfying the
-# ISI-6794 acceptance criterion.)
+# then open http://localhost:3000.
+#
+# For browser access from OUTSIDE the devcontainer (so attendees can play and
+# drive load), ISI-6795 adds Gateway API routing: 70-gateway.yaml +
+# 71-httproute.yaml route the casino Gateway's :80 listener to this Service, and
+# NGINX Gateway Fabric (installed by deploy/gateway/install.sh) exposes it on
+# NodePort 30000 -> the forwarded :30000 URL. The in-cluster ClusterIP path
+# below still works and remains the fallback.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
