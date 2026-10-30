@@ -1,0 +1,66 @@
+name: docs
+
+# CI gate for the MkDocs attendee guide: strict build + verify mermaid renders
+# in both the default (light) and slate (dark) palettes. This workflow does NOT
+# deploy — GitHub Pages publishing is owned solely by gh-pages.yml (ISI-6939),
+# so there is exactly one Pages-publishing workflow and no `pages`
+# concurrency-group conflict. ISI-6929 (ISI-6913 §3/§6).
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "mkdocs.yml"
+      - "docs-site/**"
+      - "requirements-docs.txt"
+      - "scripts/check_docs_mermaid.py"
+      - "scripts/render_palettes.py"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "mkdocs.yml"
+      - "docs-site/**"
+      - "requirements-docs.txt"
+      - "scripts/check_docs_mermaid.py"
+      - "scripts/render_palettes.py"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install docs dependencies
+        run: pip install -r requirements-docs.txt
+
+      - name: Build site (strict)
+        run: mkdocs build --strict
+
+      - name: Static mermaid/nav checks
+        run: python scripts/check_docs_mermaid.py site
+
+      - name: Install Playwright Chromium
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Render check — mermaid in both palettes
+        run: python scripts/render_palettes.py site
+
+      - name: Upload built site
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site/
+          retention-days: 7
