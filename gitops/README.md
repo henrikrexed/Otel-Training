@@ -59,11 +59,15 @@ the CLI baked into the devcontainer image.
 The casino app-deploy ticket (**ISI-6794**) owns the canonical Kubernetes
 manifests. This GitOps path **consumes** them — it never defines the app:
 
-- ISI-6794 publishes the casino manifests to a version-controlled directory.
+- ISI-6794 publishes the casino manifests to **`deploy/casino/k8s`** (plain,
+  version-controlled YAML — no Helm/Kustomize, so Argo CD's directory source
+  applies them verbatim and attendees edit a file they can read end-to-end).
 - `gitops/install/seed-gitea.sh` pushes that directory into the attendee's Gitea
-  repo under `k8s/`. Point it with `CASINO_MANIFESTS_DIR=<path>`.
-- Until ISI-6794 lands, the seed uses `gitops/seed/k8s/placeholder.yaml` so the
-  whole loop is already demonstrable (edit `replicas`, commit, watch it scale).
+  repo under `k8s/`. It is the **default** `CASINO_MANIFESTS_DIR` now that
+  ISI-6794 has landed; override the env to seed a different directory.
+- `gitops/seed/k8s/placeholder.yaml` remains as a minimal fallback — seed with
+  `CASINO_MANIFESTS_DIR=gitops/seed/k8s` for the original single-knob
+  (edit `replicas`, commit, watch it scale) demo without the full app.
 
 Once Argo CD owns the `casino` namespace, **do not** `kubectl apply` casino
 manifests by hand — `selfHeal` reverts drift. Git is authoritative.
@@ -78,21 +82,34 @@ gitops/
   install/install-argocd.sh       # Argo CD v2.13.2 + NodePort 30002 + insecure UI
   argocd/casino-repo.yaml         # repository credentials secret for Argo CD -> Gitea
   argocd/casino-application.yaml  # auto-syncing Application (prune + selfHeal)
-  seed/k8s/placeholder.yaml       # placeholder manifest (replaced by ISI-6794)
+  seed/k8s/placeholder.yaml       # placeholder manifest (fallback demo)
+  verify.sh                       # scripted live check of all three acceptance criteria
 ```
 
 ## Verification (run in the devcontainer / Codespace)
 
-Acceptance criteria for ISI-6796 are verified live on a running cluster:
+The acceptance criteria can only be proven against a running cluster, so they
+are scripted in `gitops/verify.sh` — run it after the bootstrap (it is also
+invoked by the live dry-run / `deploy-environment.sh` path):
 
 ```bash
-# 1. Application healthy + synced
-kubectl -n argocd get application casino
-#    -> SYNC STATUS: Synced   HEALTH STATUS: Healthy
+bash gitops/verify.sh      # exit 0 = all ISI-6796 acceptance checks passed
+```
 
-# 2. A commit triggers a sync that updates the running workload
-#    edit k8s/placeholder.yaml (or a real casino manifest): replicas 1 -> 3
-#    commit + push to the Gitea repo, then:
-kubectl -n argocd get application casino -o jsonpath='{.status.sync.status}'   # OutOfSync -> Synced
-kubectl -n casino get deploy                                                   # replicas reflect the commit
+It checks, writing evidence to `gitops/evidence/`:
+
+1. **Application Synced + Healthy** against the in-cluster Gitea repo.
+2. **A test commit triggers a sync that updates the cluster** — it adds a
+   throwaway `gitops-verify` ConfigMap via git, confirms it lands, then removes
+   it via git and confirms Argo CD prunes it. Non-invasive: the real casino
+   services are never touched.
+3. **Manifests are the single source of truth** — the synced repo carries every
+   canonical manifest from `deploy/casino/k8s` (ISI-6794), and the casino
+   workloads on the cluster are Argo CD-tracked (not hand-applied).
+
+Manual spot-check equivalents:
+
+```bash
+kubectl -n argocd get application casino     # SYNC: Synced   HEALTH: Healthy
+kubectl -n casino  get deploy                # casino workloads, Argo CD-managed
 ```
