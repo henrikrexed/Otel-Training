@@ -8,6 +8,7 @@
 #   Preflight  -> tools + cluster + env classification
 #   1. Observability  -> observability/install.sh        (gateway collector first)
 #   2. Dynatrace      -> deploy/dynatrace/install.sh      (operator + DynaKube)
+#   -. Gateway API    -> deploy/gateway/install.sh        (NGF CRDs; before casino)
 #   3. GitOps+casino  -> gitops/bootstrap/bootstrap-gitops.sh (Argo CD syncs casino)
 #                        (or a direct kubectl apply when DEPLOY_MODE=direct)
 #   4. Verify+banner  -> each component verify/validate.sh, aggregate, M0 banner
@@ -93,6 +94,11 @@ if [[ -n "$DO_RESET" ]]; then
   log "removing GitOps control plane (Argo CD + Gitea)"
   kubectl delete namespace argocd --ignore-not-found 2>/dev/null || true
   kubectl delete namespace gitea  --ignore-not-found 2>/dev/null || true
+
+  log "removing Gateway API controller (NGINX Gateway Fabric)"
+  # Leave the Gateway API CRDs in place (cheap to re-assert; deleting them would
+  # cascade-delete every Gateway cluster-wide). Just drop the controller ns.
+  kubectl delete namespace nginx-gateway --ignore-not-found 2>/dev/null || true
 
   log "removing Dynatrace (operator + DynaKube)"
   if [[ -x "$REPO_ROOT/deploy/dynatrace/uninstall.sh" ]]; then
@@ -191,6 +197,27 @@ else
 fi
 
 # ============================================================================
+# GATEWAY API — CRDs + NGINX Gateway Fabric (expose the casino, ISI-6795)
+# Must run BEFORE the casino phase: Argo CD (or a direct apply) materializes the
+# casino Gateway/HTTPRoute, and the Gateway API CRDs have to exist first or the
+# sync/apply fails on unknown kinds.
+# ============================================================================
+phase gateway "Gateway API + NGINX Gateway Fabric (expose casino out of the devcontainer)"
+if [[ -x "$REPO_ROOT/deploy/gateway/install.sh" ]]; then
+  if bash "$REPO_ROOT/deploy/gateway/install.sh"; then
+    ok "Gateway API layer installed — casino reachable on NodePort 30000 (forwarded)"
+    record gateway ok "NGF controller + NodePort 30000"
+  else
+    warn "gateway install reported errors — casino may not be reachable from a browser"
+    record gateway fail "install.sh non-zero"
+  fi
+else
+  warn "deploy/gateway/install.sh not present — Gateway API exposure (ISI-6795) not on this branch yet"
+  log "the casino will only be reachable in-cluster / via port-forward until it lands"
+  record gateway skip "gateway scripts absent"
+fi
+
+# ============================================================================
 # PHASE 3 — GITOPS + CASINO
 # ============================================================================
 phase 3/4 "casino app — ${DEPLOY_MODE} path"
@@ -250,6 +277,8 @@ run_verify() { # name, script, [extra env assignments...]
 
 # Observability has an OFFLINE validator (validate.sh) — always meaningful.
 run_verify observability "$REPO_ROOT/observability/validate.sh"
+# Gateway API exposure (ISI-6795): verify.sh self-selects offline/live.
+run_verify gateway "$REPO_ROOT/deploy/gateway/verify.sh"
 # Dynatrace verify only when the phase actually ran.
 if [[ -n "$DT_READY" && -z "$SKIP_DYNATRACE" ]]; then
   run_verify dynatrace "$REPO_ROOT/deploy/dynatrace/verify.sh" env "KIND_CLUSTER_NAME=$KIND_CLUSTER_NAME"
