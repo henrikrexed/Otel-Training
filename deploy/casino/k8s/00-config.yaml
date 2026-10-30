@@ -1,0 +1,48 @@
+# Shared configuration for the Vegas Casino app (ISI-6794).
+#
+# Canonical, version-controlled manifests for the per-attendee training kind
+# cluster. These are PLAIN manifests (no Helm/Kustomize) so Argo CD's directory
+# source (gitops/argocd/casino-application.yaml, path: k8s) applies them as-is
+# and the lab mechanic — edit a manifest, commit, watch Argo CD deploy — works
+# on a file an attendee can read end-to-end.
+#
+# Namespace is intentionally omitted from every resource: Argo CD places them in
+# its destination namespace (`casino`, CreateNamespace=true). Do NOT add a
+# `namespace:` field — it would fight the Application's destination.
+#
+# Rendered from helm/vegas-casino in the Perform-Hackathon-2026 source repo with
+# the training-cluster values baked in (OTLP endpoint, image registry, no
+# OpenFeature/flagd — services degrade to default flag values, confirmed in
+# services/common/openfeature.js).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vegas-casino
+  labels:
+    app.kubernetes.io/name: vegas-casino
+    app.kubernetes.io/instance: vegas-casino
+    app.kubernetes.io/part-of: casino
+    app.kubernetes.io/managed-by: argocd
+automountServiceAccountToken: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vegas-casino-config
+  labels:
+    app.kubernetes.io/name: vegas-casino
+    app.kubernetes.io/instance: vegas-casino
+    app.kubernetes.io/part-of: casino
+    app.kubernetes.io/managed-by: argocd
+data:
+  # OpenTelemetry standard environment variables
+  OTEL_SERVICE_VERSION: "2.1.0"
+  DEPLOYMENT_ENVIRONMENT: "production"
+  SERVICE_NAMESPACE: "vegas-casino"
+  K8S_CLUSTER_NAME: "otel-training"
+  # Service ports
+  SLOTS_PORT: "8081"
+  ROULETTE_PORT: "8082"
+  DICE_PORT: "8083"
+  BLACKJACK_PORT: "8084"
+  FRONTEND_PORT: "3000"
