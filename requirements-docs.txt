@@ -1,0 +1,6 @@
+# Docs build requirements for the MkDocs attendee guide (ISI-6913 / ISI-6929).
+# Pinned so local builds and CI render identically. mermaid2 renders the
+# ```mermaid fences registered as a superfences custom fence in mkdocs.yml.
+mkdocs==1.6.1
+mkdocs-material==9.7.6
+mkdocs-mermaid2-plugin==1.2.3

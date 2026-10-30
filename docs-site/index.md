@@ -34,16 +34,20 @@ code — and verify each fix in the tenant.
 Everything runs in **your GitHub Codespace** — nothing is installed on your
 laptop but a browser:
 
-```
- frontend ──gRPC──▶ slots / roulette / dice / blackjack ──┐
-    │  │                                                    ├─▶ redis
-    │  └──HTTP──▶ scoring (Java) ──▶ postgresql             │
-    └──gRPC──▶ dashboard ──HTTP──▶ scoring                  ┘
- k6 load-gen ──HTTP──▶ frontend        all services ──OTLP/gRPC──▶
-                                       otel-gateway-collector.observability:4317
-                                          │ k8sattributes → cumulativetodelta → batch
-                                          ▼
-                                     Dynatrace tenant
+```mermaid
+flowchart LR
+  k6["k6 load-gen"] -->|HTTP| fe["frontend"]
+  fe -->|gRPC| games["slots / roulette / dice / blackjack"]
+  fe -->|HTTP| scoring["scoring (Java)"]
+  fe -->|gRPC| dash["dashboard"]
+  dash -->|HTTP| scoring
+  games --> redis[("redis")]
+  scoring --> pg[("postgresql")]
+  fe -. "OTLP/gRPC" .-> gw
+  games -. "OTLP/gRPC" .-> gw
+  scoring -. "OTLP/gRPC" .-> gw
+  dash -. "OTLP/gRPC" .-> gw
+  gw["otel-gateway-collector.observability:4317<br/>k8sattributes → cumulativetodelta → batch"] --> dt[("Dynatrace tenant")]
 ```
 
 - **kind cluster** in your Codespace, one per attendee
