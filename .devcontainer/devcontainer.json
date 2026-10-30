@@ -51,7 +51,15 @@
     "DT_API_TOKEN": "${localEnv:DT_API_TOKEN}",
     "DT_INGEST_TOKEN": "${localEnv:DT_INGEST_TOKEN}",
     "KUBECONFIG": "/home/vscode/.kube/config",
-    "KIND_CLUSTER_NAME": "${localEnv:KIND_CLUSTER_NAME:otel-training}"
+    "KIND_CLUSTER_NAME": "${localEnv:KIND_CLUSTER_NAME:otel-training}",
+    // FULL_DEPLOY controls whether postCreate/postStart chain into the
+    // environment orchestrator (deploy-environment.sh, ISI-6837). Default OFF
+    // here so this stays a reusable "cluster only" base; the TRAINING prebuild
+    // sets FULL_DEPLOY=on (Codespaces var) so attendees get the whole stack —
+    // observability + Dynatrace + GitOps-synced casino — with zero manual steps.
+    "FULL_DEPLOY": "${localEnv:FULL_DEPLOY:off}",
+    // Casino delivery path: gitops (Argo CD, default) or direct (debug kubectl apply).
+    "DEPLOY_MODE": "${localEnv:DEPLOY_MODE:gitops}"
   },
 
   "customizations": {

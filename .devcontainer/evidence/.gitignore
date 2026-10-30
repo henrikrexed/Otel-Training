@@ -1,0 +1,4 @@
+# Per-run evidence bundles written by deploy-environment.sh (ISI-6837).
+# Aggregated verify output to attach to tickets, not source — keep out of git.
+*
+!.gitignore

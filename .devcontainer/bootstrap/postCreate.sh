@@ -19,6 +19,23 @@ bash "$SCRIPT_DIR/install-tools.sh"
 log "standing up kind cluster"
 bash "$SCRIPT_DIR/create-cluster.sh"
 
+# FULL_DEPLOY toggle (ISI-6837). When on (training prebuild), chain into the
+# environment orchestrator so a fresh codespace comes up with observability +
+# Dynatrace + GitOps-synced casino and zero manual steps. Off (reusable base)
+# leaves the codespace at "cluster only". Idempotent either way.
+case "${FULL_DEPLOY:-off}" in
+  on|1|true|yes)
+    log "FULL_DEPLOY=${FULL_DEPLOY} — deploying the full training environment"
+    bash "$SCRIPT_DIR/deploy-environment.sh" || {
+      echo "WARN: full deploy reported errors; inspect and re-run:" >&2
+      echo "WARN:   bash .devcontainer/bootstrap/deploy-environment.sh" >&2
+    }
+    ;;
+  *)
+    log "FULL_DEPLOY=${FULL_DEPLOY:-off} — base cluster only (run 'make up' to deploy the stack)"
+    ;;
+esac
+
 END_TS=$(date +%s)
 ELAPSED=$((END_TS - START_TS))
 {

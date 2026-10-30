@@ -14,14 +14,35 @@ source "${HERE}/versions.env"
 
 DT_TENANT="${DT_TENANT:-}"
 DT_INGEST_TOKEN="${DT_INGEST_TOKEN:-}"
+# Gated no-export mode (ISI-6837 graceful degradation). When the orchestrator
+# runs a Codespace without DT_* secrets it sets OBS_ALLOW_NO_DT=1, and the stack
+# still comes up: the gateway collector receives telemetry locally and simply
+# cannot forward it to Dynatrace. We substitute a syntactically-valid but
+# unreachable placeholder so the otlphttp exporter config stays valid (an empty
+# DT_TENANT would make the endpoint `/api/v2/otlp` and crash-loop the pod); the
+# exporter retries/drops in the background while the pod stays healthy.
+OBS_ALLOW_NO_DT="${OBS_ALLOW_NO_DT:-}"
 
-log() { printf '\033[1;34m[otel-stack]\033[0m %s\n' "$*"; }
-die() { printf '\033[1;31m[otel-stack] ERROR:\033[0m %s\n' "$*" >&2; exit 1; }
+log()  { printf '\033[1;34m[otel-stack]\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m[otel-stack] WARN:\033[0m %s\n' "$*" >&2; }
+die()  { printf '\033[1;31m[otel-stack] ERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 
 command -v kubectl >/dev/null || die "kubectl not found — run inside the devcontainer"
 kubectl get nodes >/dev/null 2>&1 || die "no reachable cluster — is the kind cluster up (ISI-6791)?"
-[[ "$DT_TENANT" == https://* ]] || die "DT_TENANT must be set to the tenant URL (https://...). Codespaces secret missing?"
-[[ -n "$DT_INGEST_TOKEN" ]] || die "DT_INGEST_TOKEN must be set. Codespaces secret missing?"
+
+if [[ "$DT_TENANT" == https://* && -n "$DT_INGEST_TOKEN" ]]; then
+  : # fully configured — export to Dynatrace
+elif [[ -n "$OBS_ALLOW_NO_DT" ]]; then
+  warn "DT_* not set — installing observability in NO-EXPORT mode."
+  warn "Collectors will receive telemetry in-cluster but cannot forward it to"
+  warn "Dynatrace. Labs that read signals in the tenant are limited until you"
+  warn "set DT_TENANT/DT_INGEST_TOKEN and re-run observability/install.sh."
+  DT_TENANT="https://no-dynatrace.invalid"
+  DT_INGEST_TOKEN="disabled-no-dynatrace"
+else
+  [[ "$DT_TENANT" == https://* ]] || die "DT_TENANT must be set to the tenant URL (https://...). Codespaces secret missing? (set OBS_ALLOW_NO_DT=1 for a no-export install.)"
+  [[ -n "$DT_INGEST_TOKEN" ]] || die "DT_INGEST_TOKEN must be set. Codespaces secret missing? (set OBS_ALLOW_NO_DT=1 for a no-export install.)"
+fi
 
 wait_rollout() { # namespace, selector
   kubectl -n "$1" rollout status "$2" --timeout=300s
