@@ -1,14 +1,21 @@
 name: Deploy GitHub Pages
 
+# Sole GitHub Pages publisher for the workshop guide (ISI-6913 / ISI-6939).
+# Builds the attendee MkDocs site (docs_dir: docs-site, mermaid2 diagrams) and
+# publishes it via the Actions-based configure/upload/deploy-pages flow.
+# The CI gate (strict build + mermaid/palette render checks) lives in docs.yml;
+# that workflow intentionally does NOT deploy, so there is exactly one
+# Pages-publishing workflow and no `pages` concurrency-group conflict.
+
 on:
   push:
     branches:
       - main
     paths:
-      - 'docs/**'
+      - 'docs-site/**'
       - 'mkdocs.yml'
+      - 'requirements-docs.txt'
       - '.github/workflows/gh-pages.yml'
-      - 'docs/assets/**'
   workflow_dispatch:
 
 permissions:
@@ -35,13 +42,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.12'
+          cache: pip
 
+      # Pinned deps (mkdocs, mkdocs-material, mkdocs-mermaid2-plugin) so the
+      # strict build renders the ```mermaid fences registered as a superfences
+      # custom fence in mkdocs.yml. Installing mkdocs-material alone would fail
+      # `mkdocs build --strict` on the unknown `mermaid2` plugin.
       - name: Install dependencies
-        run: |
-          pip install mkdocs-material[imaging]
-          pip install pymdown-extensions
-          pip install mkdocs-git-revision-date-localized-plugin
+        run: pip install -r requirements-docs.txt
 
       - name: Build documentation
         run: mkdocs build --strict

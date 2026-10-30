@@ -1,23 +1,21 @@
-site_name: Vegas Casino - Observability Hackathon
-site_description: A microservices-based casino application designed for observability and feature flag instrumentation
-site_author: Vegas Casino Team
-site_url: https://dynatrace-oss.github.io/Perform-Hackathon-2026
+site_name: Beyond the Honeymoon — OTel in Practice
+site_description: Attendee lab walkthrough for the 3h Dynatrace Perform hands-on OpenTelemetry training on the Vegas Casino
+site_author: Henrik Rexed / IsItObservable
 
-repo_name: Perform-Hackathon-2026
-repo_url: https://github.com/dynatrace-oss/Perform-Hackathon-2026
-edit_uri: edit/main/docs/
+docs_dir: docs-site
+site_dir: site
 
 theme:
   name: material
   palette:
-    - scheme: default               
-      primary: purple
+    - scheme: default
+      primary: deep purple
       accent: cyan
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
-      primary: purple
+      primary: deep purple
       accent: cyan
       toggle:
         icon: material/brightness-4
@@ -27,33 +25,29 @@ theme:
     code: Roboto Mono
   features:
     - navigation.tabs
-    - navigation.sections
-    - navigation.expand
     - navigation.top
-    - navigation.indexes
     - navigation.tracking
+    - navigation.footer
     - search.suggest
     - search.highlight
     - content.code.annotate
     - content.code.copy
     - content.tooltips
-    - content.tabs.link
-  icon:
-    repo: fontawesome/brands/github
-
-extra_css:
-  - assets/css/dynatrace-theme.css
 
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  # mkdocs-mermaid2-plugin clashes with Material's native superfences mermaid
+  # handling (ISI-6913 §4.2). The fix is to register a custom fence that hands
+  # ```mermaid blocks to mermaid2.fence_mermaid instead of letting superfences
+  # syntax-highlight them. With this in place the two coexist: superfences emits
+  # <pre class="mermaid"> and the mermaid2 plugin renders it client-side.
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
           class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+          format: !!python/name:mermaid2.fence_mermaid
   - admonition
   - pymdownx.details
   - pymdownx.tabbed:
@@ -66,53 +60,39 @@ markdown_extensions:
 
 nav:
   - Welcome: index.md
-  - Hackathon:
-    - Hackathon Overview: overview/hackathon-index.md
-    - GitHub:
-      - Introduction to GitHub Copilot: overview/Challenge-01.md
-      - Best Practices When Using Copilot: overview/Challenge-02.md
-      - Extending GitHub Copilot with Model Context Protocol: overview/Challenge-03.md
-    - Dynatrace:
-      - Launching your Environment: overview/DTChallenge-00.md
-      - Prompt your observability data: overview/DTChallenge-01.md
-      - Improve your OpenTelemetry instrumentation: overview/DTChallenge-02.md
-      - Improve your Dynatrace Setup: overview/DTChallenge-03.md
-    - Bonus:
-      - Customizing GitHub Copilot in Your IDE: overview/Challenge-04.md
-      - Convert B-MAD Agent to GitHub Copilot Agent: overview/Challenge-05.md
-      - Build a Custom Dynatrace App: overview/DTChallenge-04.md
-  - Environment Setup:
-    - DevContainer Overview: deployment/devcontainer.md
-    - Deployment Architecture: deployment/index.md
-  - Development:
-    - Source Code Locations: development/source-code.md
-    - GitHub Actions Workflow: development/github-actions.md
-    - Updating with Helm: development/helm-updates.md
-    - Feature Flags Guide: development/feature-flags.md
-  - Architecture:
-    - System Architecture: architecture/index.md
-    - Components: architecture/components.md
-  - Contributing: contributing.md
+  - M0 — Environment Setup: setup.md
+  - M1 — Tour the broken casino: module-1.md
+  - M2 — SDK configuration by file: module-2.md
+  - M3 — The collector as control point: module-3.md
+  - "M4 — Sampling: cost/fidelity strategy": module-4.md
+  - M5 — Operating at scale: module-5.md
+  - Troubleshooting: troubleshooting.md
+  # Option A (ISI-6913): new advanced self-paced track ALONGSIDE M0–M5.
+  # Pages are stubs pending §2 content authoring (ISI-6930).
+  - Advanced self-paced track:
+      - Getting started: advanced/getting-started.md
+      - The environment: advanced/environment.md
+      - Step 1 — Instrument with AI agents: advanced/step-1-instrument-with-agents.md
+      - Step 2 — Weaver pipeline: advanced/step-2-weaver-pipeline.md
+      - Step 3 — Cost of observability: advanced/step-3-cost-of-observability.md
+      - Step 4 — High-cardinality metrics: advanced/step-4-high-cardinality.md
+      - Step 5 — PII in logs: advanced/step-5-pii-logs.md
+      - Step 6 — Tail sampling: advanced/step-6-tail-sampling.md
 
 plugins:
   - search
-  - git-revision-date-localized:
-      enable_creation_date: true
-
-# Exclude files that are not meant to be standalone pages
-# (snippets are included via --8<-- syntax, old content, etc.)
-exclude_docs: |
-  snippets/**
-  overview/hackathon.md
-  overview/index.md
-  getting-started.md
-  architecture/technology.md
-  deployment/ci-cd.md
-  deployment/helm.md
-  deployment/k8s-vs-helm.md
-  deployment/manifests.md
-  deployment/openfeature.md
-  development/building.md
-  development/docker.md
-  testing/**
-
+  # Pinned in requirements-docs.txt (mkdocs-mermaid2-plugin==1.2.3).
+  # theme is a raw-JS expression (the leading ^) so each diagram follows the
+  # Material palette the attendee has selected: slate -> dark, default -> light.
+  - mermaid2:
+      version: 10.9.1
+      arguments:
+        # Raw-JS expression (leading ^) evaluated at page load, so each diagram
+        # follows the Material palette the attendee has selected: slate -> dark,
+        # default -> light. Material persists the choice in localStorage, so a
+        # reload after toggling re-renders the diagrams in the new palette.
+        # NB: do NOT add an `extra_javascript:` entry here — mermaid2 1.2.x
+        # misreads the first extra_javascript as the mermaid library override
+        # and then skips loading the real runtime (diagrams silently fail).
+        theme: |
+          ^(window.matchMedia && JSON.parse(window.localStorage.getItem("__palette") || "{}")?.color?.scheme === "slate") ? "dark" : "default"
