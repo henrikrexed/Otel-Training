@@ -1,0 +1,41 @@
+# Gateway API Gateway for the casino (ISI-6795) — the public entry point that
+# lets attendees play the app (and drive load) from a browser outside the
+# devcontainer.
+#
+# It binds the `nginx` GatewayClass installed as cluster infra by
+# deploy/gateway/install.sh (NGINX Gateway Fabric). When this Gateway is
+# applied, NGF provisions an nginx data-plane Deployment + a NodePort Service in
+# THIS namespace; the NginxProxy override pins the :80 listener to NodePort
+# 30000 (see deploy/gateway/manifests/nginxproxy-nodeport.yaml). kind maps node
+# 30000 -> host 30000 and the devcontainer forwards it, so the casino is at the
+# attendee's forwarded :30000 URL.
+#
+# Argo CD owns this file (same casino app as the rest of k8s/), so the
+# edit -> commit -> auto-sync lab mechanic applies to routing too. The Gateway
+# API CRDs must already be installed before Argo syncs this — the bootstrap runs
+# the gateway installer before the casino phase, so they are.
+#
+# No `hostnames:` on the listener/route on purpose: Codespaces forwards the port
+# behind a generated *.app.github.dev host that differs per attendee, so we must
+# accept any Host header rather than pin one.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: casino
+  labels:
+    app.kubernetes.io/name: vegas-casino
+    app.kubernetes.io/instance: vegas-casino
+    app.kubernetes.io/part-of: casino
+    app.kubernetes.io/managed-by: argocd
+    app.kubernetes.io/component: gateway
+spec:
+  gatewayClassName: nginx
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        # HTTPRoutes may only attach from this (casino) namespace — the frontend
+        # Service and the route both live here, so no ReferenceGrant is needed.
+        namespaces:
+          from: Same

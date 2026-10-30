@@ -1,0 +1,3 @@
+# Runtime verification output from verify.sh (ISI-6795). Per-run evidence
+# bundles to attach to tickets, not source — keep them out of git.
+evidence/

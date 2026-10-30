@@ -1,0 +1,51 @@
+# NodePort override for the NGINX Gateway Fabric data plane (ISI-6795).
+#
+# NGF's default deploy ships a cluster-default NginxProxy named
+# `nginx-gateway-proxy-config` in the `nginx-gateway` namespace, and the `nginx`
+# GatewayClass references it via parametersRef. Its default service type is
+# `LoadBalancer`, which never gets an address on a bare kind cluster (no cloud
+# LB / MetalLB) — so the casino would be unreachable.
+#
+# This manifest RE-APPLIES that same NginxProxy (same name + namespace, so it
+# overrides the shipped one) with the service switched to NodePort and the
+# listener-80 port pinned to NodePort 30000. kind-config.yaml maps the node's
+# 30000 -> host 30000 and devcontainer.json forwards it, so every attendee
+# reaches their own casino at the forwarded :30000 URL.
+#
+# install.sh applies the NGF default deploy FIRST, then this file, so the order
+# is deterministic and the whole thing is idempotent (re-running just re-asserts
+# the NodePort config).
+#
+# Why not port 80 directly? Kubernetes NodePort services must fall in
+# 30000-32767, so 80 is not a legal NodePort. The 80/443 host mappings in
+# kind-config.yaml are left available for a future clean-URL (hostPort) setup;
+# the reserved 30000-30002 band is the supported, root-free path today.
+apiVersion: gateway.nginx.org/v1alpha2
+kind: NginxProxy
+metadata:
+  labels:
+    app.kubernetes.io/instance: nginx-gateway
+    app.kubernetes.io/name: nginx-gateway
+    # Kept in sync with NGF_VERSION in versions.env.
+    app.kubernetes.io/version: 2.8.0
+  name: nginx-gateway-proxy-config
+  namespace: nginx-gateway
+spec:
+  kubernetes:
+    deployment:
+      container:
+        image:
+          pullPolicy: IfNotPresent
+          repository: ghcr.io/nginx/nginx-gateway-fabric/nginx
+          tag: 2.8.0
+      replicas: 1
+    service:
+      # NodePort instead of the LoadBalancer default (kind has no cloud LB).
+      type: NodePort
+      # Preserve the client source IP where the single kind node schedules the
+      # data-plane pod.
+      externalTrafficPolicy: Local
+      # Pin the Gateway's :80 HTTP listener to a stable, forwarded NodePort.
+      nodePorts:
+        - port: 30000
+          listenerPort: 80
