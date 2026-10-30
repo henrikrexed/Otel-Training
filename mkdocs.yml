@@ -38,7 +38,16 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
-  - pymdownx.superfences
+  # mkdocs-mermaid2-plugin clashes with Material's native superfences mermaid
+  # handling (ISI-6913 §4.2). The fix is to register a custom fence that hands
+  # ```mermaid blocks to mermaid2.fence_mermaid instead of letting superfences
+  # syntax-highlight them. With this in place the two coexist: superfences emits
+  # <pre class="mermaid"> and the mermaid2 plugin renders it client-side.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid
   - admonition
   - pymdownx.details
   - pymdownx.tabbed:
@@ -58,6 +67,32 @@ nav:
   - "M4 — Sampling: cost/fidelity strategy": module-4.md
   - M5 — Operating at scale: module-5.md
   - Troubleshooting: troubleshooting.md
+  # Option A (ISI-6913): new advanced self-paced track ALONGSIDE M0–M5.
+  # Pages are stubs pending §2 content authoring (ISI-6930).
+  - Advanced self-paced track:
+      - Getting started: advanced/getting-started.md
+      - The environment: advanced/environment.md
+      - Step 1 — Instrument with AI agents: advanced/step-1-instrument-with-agents.md
+      - Step 2 — Weaver pipeline: advanced/step-2-weaver-pipeline.md
+      - Step 3 — Cost of observability: advanced/step-3-cost-of-observability.md
+      - Step 4 — High-cardinality metrics: advanced/step-4-high-cardinality.md
+      - Step 5 — PII in logs: advanced/step-5-pii-logs.md
+      - Step 6 — Tail sampling: advanced/step-6-tail-sampling.md
 
 plugins:
   - search
+  # Pinned in requirements-docs.txt (mkdocs-mermaid2-plugin==1.2.3).
+  # theme is a raw-JS expression (the leading ^) so each diagram follows the
+  # Material palette the attendee has selected: slate -> dark, default -> light.
+  - mermaid2:
+      version: 10.9.1
+      arguments:
+        # Raw-JS expression (leading ^) evaluated at page load, so each diagram
+        # follows the Material palette the attendee has selected: slate -> dark,
+        # default -> light. Material persists the choice in localStorage, so a
+        # reload after toggling re-renders the diagrams in the new palette.
+        # NB: do NOT add an `extra_javascript:` entry here — mermaid2 1.2.x
+        # misreads the first extra_javascript as the mermaid library override
+        # and then skips loading the real runtime (diagrams silently fail).
+        theme: |
+          ^(window.matchMedia && JSON.parse(window.localStorage.getItem("__palette") || "{}")?.color?.scheme === "slate") ? "dark" : "default"
