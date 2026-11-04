@@ -1,4 +1,6 @@
-# local devcontainer secrets
+# local secrets — filled-in copies of the *.env.sample / *.env.example files.
+# Keep the samples tracked (.env.sample, .env.example); never commit a real .env.
+/.env
 .devcontainer/.env
 
 # mkdocs build output
