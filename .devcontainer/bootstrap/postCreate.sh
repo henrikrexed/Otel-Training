@@ -16,6 +16,15 @@ log() { echo "==> $*"; }
 log "verifying toolchain (self-heal if needed)"
 bash "$SCRIPT_DIR/install-tools.sh"
 
+# DCO auto sign-off (ISI-7068). Point this repo's hooks at the tracked
+# .githooks/ so every `git commit` auto-appends a Signed-off-by: trailer and
+# PRs pass the DCO GitHub App check without anyone remembering `git commit -s`.
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -n "$REPO_ROOT" ] && [ -d "$REPO_ROOT/.githooks" ]; then
+  log "enabling DCO auto sign-off (core.hooksPath -> .githooks)"
+  git -C "$REPO_ROOT" config core.hooksPath .githooks
+fi
+
 log "standing up kind cluster"
 bash "$SCRIPT_DIR/create-cluster.sh"
 

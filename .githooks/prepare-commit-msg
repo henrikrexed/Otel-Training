@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# prepare-commit-msg — auto-append a DCO Signed-off-by trailer (ISI-7068).
+#
+# Every PR to henrikrexed/Otel-Training is checked by the DCO GitHub App, which
+# requires each commit to carry a `Signed-off-by:` trailer (what `git commit -s`
+# adds). This hook adds that trailer automatically from the configured git
+# identity when it is missing, so neither attendees nor agents have to remember
+# the `-s` flag.
+#
+# Wired via `git config core.hooksPath .githooks` (devcontainer postCreate.sh,
+# or `make dco-setup`). It fires on the plain `git commit` path.
+#
+# NOTE: `git commit-tree` / temp-index commits (the path the Paperclip agents
+# use on the shared working tree) bypass ALL git hooks by design, so agents must
+# still put the `Signed-off-by:` trailer in the commit message body themselves —
+# see CONTRIBUTING.md ("Agents / temp-index commits").
+set -euo pipefail
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="${2:-}"
+
+# Don't touch merge/squash messages or messages supplied verbatim (-m with a
+# message that already came from somewhere we shouldn't rewrite). We still sign
+# the common cases: normal commits, templates, and `-m`.
+case "$COMMIT_SOURCE" in
+  merge|squash) exit 0 ;;
+esac
+
+NAME="$(git config user.name  || true)"
+EMAIL="$(git config user.email || true)"
+if [ -z "$NAME" ] || [ -z "$EMAIL" ]; then
+  # No identity to sign with; let the commit proceed (DCO will flag it, which is
+  # the correct signal that `git config user.name/email` needs to be set).
+  exit 0
+fi
+
+SOB="Signed-off-by: ${NAME} <${EMAIL}>"
+
+# Idempotent: if an identical sign-off is already present (e.g. the user ran
+# `git commit -s`, or this hook ran before on an amend), do nothing.
+if grep -qxF -- "$SOB" "$COMMIT_MSG_FILE"; then
+  exit 0
+fi
+
+# Append as a proper git trailer. `interpret-trailers` places it in the trailer
+# block alongside Co-Authored-By and skips comment lines and the scissors line.
+git interpret-trailers --if-exists addIfDifferent \
+  --trailer "$SOB" --in-place "$COMMIT_MSG_FILE"
