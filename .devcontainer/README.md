@@ -4,9 +4,59 @@ Per-attendee Codespace / devcontainer for the **Perform Hotday OTel training**
 ([ISI-6791](/ISI/issues/ISI-6791)). One codespace per attendee, each with its own
 local **kind** cluster, all pointed at the same shared Dynatrace tenant.
 
-This is the **foundation layer**. The casino app, observability stack, Dynatrace
-operator, Gateway API, and GitLab+Argo are provisioned by downstream tickets on
-top of this base.
+This is the **full training environment**. The devcontainer stands up the kind
+cluster and then — when `FULL_DEPLOY` is on — chains into a single orchestrator
+([`deploy-environment.sh`](./bootstrap/deploy-environment.sh), [ISI-6837](/ISI/issues/ISI-6837))
+that brings up the observability stack, the Dynatrace operator, and the
+GitOps-synced casino with **zero manual steps**. Left off, it stays a reusable
+"cluster only" base. The orchestrator is pure **glue** — it calls the component
+scripts owned by their own tickets:
+
+- observability collection topology — [`observability/`](../observability/README.md) ([ISI-6792](/ISI/issues/ISI-6792))
+- Dynatrace operator + DynaKube — [`deploy/dynatrace/`](../deploy/dynatrace/README.md) ([ISI-6793](/ISI/issues/ISI-6793))
+- casino app manifests — [`deploy/casino/`](../deploy/casino/README.md) ([ISI-6794](/ISI/issues/ISI-6794))
+- GitOps path (Gitea + Argo CD) — [`gitops/`](../gitops/README.md) ([ISI-6796](/ISI/issues/ISI-6796))
+
+## Full environment in one command
+
+```bash
+make up        # observability + Dynatrace + GitOps-synced casino (idempotent)
+make reset     # tear down app/obs/dt/gitops, keep the kind cluster
+make verify    # re-run component verification + print the M0 env-check banner
+```
+
+`make up` wraps `bash .devcontainer/bootstrap/deploy-environment.sh`. It runs
+**observability first** (the gateway collector
+`otel-gateway-collector.observability:4317` is the casino's telemetry sink),
+then Dynatrace, then the casino via Argo CD, and finally runs each component's
+`verify.sh` / `validate.sh` and prints an aggregated **M0 env-check banner** plus
+an evidence bundle under `.devcontainer/evidence/`.
+
+Flags / env:
+
+| Flag / env | Effect |
+|------------|--------|
+| `--reset` | tear down app/obs/dt/gitops (keep the cluster) |
+| `--skip-dynatrace` | skip the Dynatrace phase |
+| `DEPLOY_MODE=gitops` *(default)* | casino via Argo CD (preserves the edit→commit→sync lab) |
+| `DEPLOY_MODE=direct` | casino via direct `kubectl apply` (debug path, no GitOps) |
+
+### Graceful degradation (no `DT_*` secrets)
+
+The three `DT_*` secrets are **optional** for bring-up. Without them the cluster,
+observability (in a no-export mode — collectors run but cannot forward to the
+tenant), and the casino still come up; the orchestrator **auto-skips Dynatrace**
+and prints which labs are limited. Set `DT_TENANT` / `DT_API_TOKEN` /
+`DT_INGEST_TOKEN` and re-run `make up` to enable the full telemetry path.
+
+### Automatic bring-up (`FULL_DEPLOY`)
+
+`FULL_DEPLOY` (a Codespaces var) decides whether `postCreate`/`postStart` run the
+orchestrator automatically:
+
+- **`on`** — the **training prebuild**: a fresh Codespace comes up fully deployed;
+  a stop/resume re-runs the orchestrator (idempotent) to restore the stack.
+- **`off`** *(default in this base)* — cluster only; deploy on demand with `make up`.
 
 ## What it provisions
 
@@ -19,11 +69,49 @@ top of this base.
 
 ## Quick verify (acceptance)
 
+Base cluster:
+
 ```bash
 kubectl get nodes        # -> control-plane Ready
 dtctl version            # -> dtctl responds
 cat ~/.otel-training-coldstart.txt   # -> recorded cold-start seconds
 ```
+
+**M0 attendee env-check** (full environment — runs every component check and
+prints the pass/fail banner):
+
+```bash
+make verify
+```
+
+## Running locally on Apple Silicon (M1/M2/M3 Macs)
+
+GitHub Codespaces runs on **amd64** cloud VMs, so the attendee path is unaffected
+by CPU architecture. This section is only for anyone building the devcontainer
+**locally** (VS Code Dev Containers / `devcontainer` CLI / Docker Desktop) on an
+Apple Silicon Mac.
+
+The image is **multi-arch and intentionally not `--platform`-pinned**, so a native
+build produces an `arm64` image and `install-tools.sh` installs native `arm64`
+binaries. The failure mode to avoid (ISI-7044): if the image resolves to
+**`linux/amd64` on an Apple Silicon host**, kind runs its node containers under
+QEMU emulation and **segfaults**.
+
+To stay native:
+
+- **Do not** pass `--platform=linux/amd64` when building or opening the container.
+- Clear any stale amd64-built image and rebuild (VS Code: *Dev Containers: Rebuild
+  Without Cache*).
+- Check Docker Desktop isn't forcing a default amd64 platform.
+
+Prove your toolchain is host-native at any time:
+
+```bash
+bash .devcontainer/bootstrap/verify-arch.sh   # URLs for both arches + installed-binary arch
+```
+
+A green `RESULT: all installed binaries match host arch (arm64)` plus a successful
+`kubectl get nodes` after `create-cluster.sh` is the full proof the segfault is gone.
 
 ## Required secrets / env (per attendee)
 
@@ -32,10 +120,12 @@ image. Full template in [`.env.example`](./.env.example).
 
 | Variable | Purpose |
 |----------|---------|
-| `DT_TENANT` | Dynatrace tenant URL (e.g. `https://abc12345.live.dynatrace.com`) |
-| `DT_API_TOKEN` | API token for `dtctl` / config tooling (least-privilege) |
-| `DT_INGEST_TOKEN` | OTLP data-ingest token for collectors/operator |
+| `DT_TENANT` | Dynatrace tenant URL (e.g. `https://abc12345.live.dynatrace.com`) — *optional; see graceful degradation* |
+| `DT_API_TOKEN` | API token for `dtctl` / config tooling (least-privilege) — *optional* |
+| `DT_INGEST_TOKEN` | OTLP data-ingest token for collectors/operator — *optional* |
 | `KIND_CLUSTER_NAME` | **unique per attendee** — drives cluster + `service.name` isolation |
+| `FULL_DEPLOY` | `on` to auto-deploy the full stack at create/start (training prebuild); `off` = cluster only |
+| `DEPLOY_MODE` | `gitops` (default, Argo CD) or `direct` (debug `kubectl apply`) |
 
 To set them: GitHub → repo (or org) → **Settings → Secrets and variables →
 Codespaces** → add each as a Codespaces secret scoped to this repo. They surface
@@ -84,6 +174,22 @@ FORCE=1 bash .devcontainer/bootstrap/install-tools.sh
 - Stop/resume keeps the cluster (postStart re-attaches); a full rebuild recreates
   it from scratch.
 
+### Recorded measurement
+
+> _Pending live capture ([ISI-6805](/ISI/issues/ISI-6805))._ Open a Codespace from
+> the `feat/ISI-6791-devcontainer-base` branch, let `postCreate` finish, then run the
+> one-liner below and paste the output on the ticket — the numbers get filled in here.
+
+```bash
+# in a fresh Codespace, once it has finished building:
+kubectl get nodes && dtctl version && cat ~/.otel-training-coldstart.txt
+```
+
+| Metric | Value |
+|--------|-------|
+| First cold start, no prebuild (s) | _TBD — live capture_ |
+| Warm start, prebuild or stop/resume (s) | _TBD — live capture_ |
+
 ## Files
 
 ```
@@ -92,9 +198,13 @@ FORCE=1 bash .devcontainer/bootstrap/install-tools.sh
 ├── Dockerfile               # ubuntu-24.04 base + baked toolchain
 ├── .env.example             # documented per-attendee secrets/env
 └── bootstrap/
-    ├── install-tools.sh     # idempotent, version-pinnable, arch-aware tool install
-    ├── kind-config.yaml      # single-node kind cluster w/ 80/443 + NodePorts
-    ├── create-cluster.sh    # idempotent cluster create / re-attach
-    ├── postCreate.sh        # once: verify tools, create cluster, record timing
-    └── postStart.sh         # every start: heal/re-attach cluster
+    ├── install-tools.sh       # idempotent, version-pinnable, arch-aware tool install
+    ├── verify-arch.sh         # proof: resolved URLs per arch + installed-binary arch (ISI-7049)
+    ├── kind-config.yaml        # single-node kind cluster w/ 80/443 + NodePorts
+    ├── create-cluster.sh      # idempotent cluster create / re-attach
+    ├── deploy-environment.sh  # ISI-6837 orchestrator: obs -> dynatrace -> gitops casino -> verify
+    ├── postCreate.sh          # once: verify tools, create cluster, [FULL_DEPLOY] orchestrate
+    └── postStart.sh           # every start: heal cluster, [FULL_DEPLOY] reconverge
+
+Makefile                       # make up / reset / verify — thin wrappers over the orchestrator
 ```
