@@ -49,6 +49,16 @@ to deploy the workflows and notebook used in this demo. Permissions:
 
 - A Dynatrace [Platform token](https://docs.dynatrace.com/docs/manage/identity-access-management/access-tokens-and-oauth-clients/platform-tokens){target=_blank} to trigger the Davis CoPilot from the demo workflow. Permissions:
     - `davis-copilot:conversations:execute`
+
+    !!! warning "Davis CoPilot requires an IAM policy + group assignment"
+        The `davis-copilot:conversations:execute` permission is **not** granted by the platform token alone — it is an IAM permission that must be bound to your user through a group. If you skip this, the Davis CoPilot step of the demo workflow will fail with an authorization error. Do the following in [Dynatrace Account Management](https://docs.dynatrace.com/docs/manage/identity-access-management/permission-management/manage-user-permissions-policies){target="_blank"}:
+
+        1. **Create (or reuse) a policy** that contains the statement:
+           ```
+           ALLOW davis-copilot:conversations:execute;
+           ```
+        2. **Bind the policy to a group** (create a new group for the workshop, or reuse an existing one).
+        3. **Assign your user to that group** so the permission is effective for the account that owns the platform token.
 - [Allow an outbound connection from Dynatrace](https://developer.dynatrace.com/develop/functions/allow-outbound-connections/){target="_blank"}
   to `api.github.com` so that the demo workflow can communicate with GitHub.
 
@@ -130,8 +140,7 @@ to read more about timeout periods for Codespaces and how to configure them.
     set DYNATRACE_ENVIRONMENT=live
     set DYNATRACE_API_TOKEN=dt0c01.******.***********
     set DYNATRACE_PLATFORM_TOKEN=dt0c01.******.***********
-    set DYNATRACE_OAUTH_CLIENT_ID=****
-    set DYNATRACE_OAUTH_CLIENT_SECRET=******
+    set DYNATRACE_OAUTH_CLIENT_SECRET=dt0s02.******.***********
     ```
 
     * Start Docker / Podman

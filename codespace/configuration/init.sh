@@ -57,6 +57,25 @@ export TF_VAR_codespace_name="$SANITIZED_CODESPACE"
 
 
 
+# Derive the OAuth client id from the client secret so the attendee only has to
+# provide one value. A Dynatrace OAuth client secret has the form
+# `dt0s02.<id>.<secret>`; the client id is the first two dot-segments `dt0s02.<id>`.
+if [ -z "$DYNATRACE_OAUTH_CLIENT_SECRET" ]; then
+    echo "❌ Error: DYNATRACE_OAUTH_CLIENT_SECRET is not set!"
+    echo "   This is required and the OAuth client id is derived from it."
+    echo "   Configure the DYNATRACE_OAUTH_CLIENT_SECRET secret (form dt0s02.<id>.<secret>)."
+    exit 1
+fi
+if ! printf '%s' "$DYNATRACE_OAUTH_CLIENT_SECRET" | grep -qE '^dt0s02\.[^.]+\.[^.]+'; then
+    echo "❌ Error: DYNATRACE_OAUTH_CLIENT_SECRET is malformed!"
+    echo "   Expected the Dynatrace OAuth client secret form: dt0s02.<id>.<secret>"
+    echo "   The client id cannot be derived from the value provided."
+    exit 1
+fi
+DYNATRACE_OAUTH_CLIENT_ID="$(printf '%s' "$DYNATRACE_OAUTH_CLIENT_SECRET" | cut -d. -f1,2)"
+export DYNATRACE_OAUTH_CLIENT_ID
+echo "✅ Derived DYNATRACE_OAUTH_CLIENT_ID from secret: $DYNATRACE_OAUTH_CLIENT_ID"
+
 export DYNATRACE_AUTOMATION_CLIENT_ID=$DYNATRACE_OAUTH_CLIENT_ID
 export DYNATRACE_AUTOMATION_CLIENT_SECRET=$DYNATRACE_OAUTH_CLIENT_SECRET
 
