@@ -1,0 +1,63 @@
+site_name: Beyond the Honeymoon — OTel in Practice
+site_description: Attendee lab walkthrough for the 3h Dynatrace Perform hands-on OpenTelemetry training on the Vegas Casino
+site_author: Henrik Rexed / IsItObservable
+
+docs_dir: docs-site
+site_dir: site
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - navigation.tabs
+    - navigation.top
+    - navigation.tracking
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+    - content.code.copy
+    - content.tooltips
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+nav:
+  - Welcome: index.md
+  - M0 — Environment Setup: setup.md
+  - M1 — Tour the broken casino: module-1.md
+  - M2 — SDK configuration by file: module-2.md
+  - M3 — The collector as control point: module-3.md
+  - "M4 — Sampling: cost/fidelity strategy": module-4.md
+  - M5 — Operating at scale: module-5.md
+  - Troubleshooting: troubleshooting.md
+
+plugins:
+  - search

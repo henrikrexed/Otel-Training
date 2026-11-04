@@ -10,4 +10,7 @@ Project: Hotday otel beyon HoneyMoon (ISI-4025)
 - [`docs/abstract.md`](docs/abstract.md) — Perform session abstract (working title, takeaways, audience)
 - [`docs/training-structure.md`](docs/training-structure.md) — full 3-hour structure: agenda, module-by-module labs, planted-defect inventory, logistics
 - [`docs/attendee-guide-v1.md`](docs/attendee-guide-v1.md) — attendee-facing lab guide v1 (M0–M4): step-by-step commands, Dynatrace checks, troubleshooting (ISI-4031)
+- **`mkdocs.yml` + [`docs-site/`](docs-site/)** — **attendee-facing mkdocs training site** (ISI-6797): module arc M0–M5 with per-module
+  concepts, exercises, planted-defect hunts (D1 trace-context, D2 high-cardinality, D3 PII logs — [ISI-6790](/ISI/issues/ISI-6790)),
+  fixes via the GitOps loop, and Dynatrace verification. Build: `mkdocs build --strict` (or `mkdocs serve`) from the repo root.
 - [`observability/`](observability/) — OTel collection topology for the kind cluster: OTel Operator + DaemonSet logs collector + gateway collector (k8sattributes / cumulativetodelta / Dynatrace OTLP export) with offline `validate.sh` (ISI-6792)

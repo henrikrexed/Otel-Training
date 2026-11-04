@@ -1,0 +1,16 @@
+# Runtime verification output from verify.sh (ISI-6807). These are per-run
+# evidence bundles to attach to tickets, not source — keep them out of git.
+evidence/
+
+# Rendered token Secret manifests (ISI-6985). Dynatrace tokens are injected at
+# runtime by install.sh from $DT_API_TOKEN / $DT_INGEST_TOKEN (Codespace
+# secrets); a materialized Secret must NEVER be committed. Only the
+# secret.example.yaml placeholder template belongs in git.
+secret.yaml
+secret.yml
+secret.*.yaml
+secret.*.yml
+!secret.example.yaml
+*-secret.yaml
+*.secret.yaml
+dynakube-secret.yaml

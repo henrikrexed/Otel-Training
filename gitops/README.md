@@ -28,7 +28,27 @@ auto-syncing `casino` Application. Idempotent — safe after a stop/resume.
 | Gitea UI   | `http://localhost:30001` | `attendee` / `trainingpass123`           |
 | Argo CD UI | `http://localhost:30002` | `admin` / (printed by the install step)  |
 
-## Why Gitea instead of a self-managed GitLab
+## Git host: external GitLab (default) or in-cluster Gitea (fallback)
+
+**Board decision (ISI-6927, locked):** the training uses **GitLab + Argo CD**
+because GitLab is part of the Dynatrace solution. Because in-cluster GitLab CE
+does not fit the 8 GB per-attendee budget (see the table below), the git host
+lives **outside** the Codespace: a shared Dynatrace-solution GitLab the attendee
+**forks** the casino project into, and Argo CD connects to that fork with a token
+injected as a Codespace secret. Full decision record + the exact attendee
+fork-first + token-injection flow: **`docs/ISI-6927-gitlab-environment.md`**.
+
+`bootstrap-gitops.sh` selects the provider via `GITOPS_PROVIDER`:
+
+| `GITOPS_PROVIDER` | Git host | Needs | Use |
+| --- | --- | --- | --- |
+| `gitlab` *(default)* | external GitLab fork | `GITLAB_REPO_URL` + `GITLAB_TOKEN` secrets | training default (board decision) |
+| `gitea` | in-cluster Gitea | nothing (self-contained) | offline / air-gapped fallback |
+
+Both paths give Argo CD a plain git remote, so the casino Application, manifests,
+and the edit→commit→sync lab mechanic are identical.
+
+## Why not in-cluster GitLab (resource cost)
 
 The ticket allows "self-managed in-cluster **or** lightweight; document choice +
 resource cost." Each attendee gets their **own** kind cluster inside a 4-core /
@@ -42,13 +62,14 @@ what's left.
 | Gitea (SQLite, single pod)    | **~150–200 MB** | ✅ Yes                         | Web UI, HTTP git, webhooks, orgs/repos — same attendee UX     |
 | External shared GitLab/gitlab.com | 0 in-cluster | ✅ (but) | Needs accounts, network, per-attendee forks — breaks the self-contained offline story |
 
-**Decision:** in-cluster **Gitea** (`gitea/gitea:1.22.6`, SQLite, ~150 MB,
-requests `100m` CPU / `192Mi`). The attendee-facing GitOps experience — browse a
-repo, edit a file, commit, watch Argo CD deploy it — is identical to GitLab. If
-the board specifically needs literal GitLab, the only viable path on this budget
-is an **external** shared GitLab instance (documented row above); in-cluster
-GitLab per attendee is not feasible. Argo CD treats any of these as a plain git
-remote, so the Application manifest is unchanged either way.
+**Outcome (ISI-6796 → ISI-6927):** ISI-6796 originally shipped in-cluster
+**Gitea** (`gitea/gitea:1.22.6`, SQLite, ~150 MB, requests `100m` CPU / `192Mi`).
+The board then locked **GitLab** (part of the Dynatrace solution). Because
+in-cluster GitLab CE per attendee is infeasible on this budget (first row), the
+training default is now the **external shared GitLab** fork (third row) — see the
+provider table above and `docs/ISI-6927-gitlab-environment.md`. Gitea is retained
+as the `GITOPS_PROVIDER=gitea` offline fallback; its attendee-facing experience —
+browse a repo, edit a file, commit, watch Argo CD deploy it — is identical.
 
 Argo CD itself adds ~0.5–1 GB (repo-server, application-controller, server,
 redis, dex, applicationset, notifications) and is pinned to `v2.13.2` to match
@@ -77,26 +98,40 @@ manifests by hand — `selfHeal` reverts drift. Git is authoritative.
 ```
 gitops/
   bootstrap/bootstrap-gitops.sh   # one-command: gitea -> seed -> argocd -> application
-  install/gitea.yaml              # lightweight git host (namespace, PVC, deploy, svc, NodePort 30001)
-  install/seed-gitea.sh           # admin user + casino repo + push manifests
+  install/configure-gitlab-repo.sh # [gitlab] register attendee GitLab fork + casino App (DRY_RUN=1 to preview)
+  install/gitea.yaml              # [gitea]  lightweight git host (namespace, PVC, deploy, svc, NodePort 30001)
+  install/seed-gitea.sh           # [gitea]  admin user + casino repo + push manifests
   install/install-argocd.sh       # Argo CD v2.13.2 + NodePort 30002 + insecure UI
   argocd/casino-repo.yaml         # repository credentials secret for Argo CD -> Gitea
   argocd/casino-application.yaml  # auto-syncing Application (prune + selfHeal)
-  seed/k8s/placeholder.yaml       # placeholder manifest (replaced by ISI-6794)
+  seed/k8s/placeholder.yaml       # placeholder manifest (fallback demo)
+  verify.sh                       # scripted live check of all three acceptance criteria
 ```
 
 ## Verification (run in the devcontainer / Codespace)
 
-Acceptance criteria for ISI-6796 are verified live on a running cluster:
+The acceptance criteria can only be proven against a running cluster, so they
+are scripted in `gitops/verify.sh` — run it after the bootstrap (it is also
+invoked by the live dry-run / `deploy-environment.sh` path):
 
 ```bash
-# 1. Application healthy + synced
-kubectl -n argocd get application casino
-#    -> SYNC STATUS: Synced   HEALTH STATUS: Healthy
+bash gitops/verify.sh      # exit 0 = all ISI-6796 acceptance checks passed
+```
 
-# 2. A commit triggers a sync that updates the running workload
-#    edit k8s/placeholder.yaml (or a real casino manifest): replicas 1 -> 3
-#    commit + push to the Gitea repo, then:
-kubectl -n argocd get application casino -o jsonpath='{.status.sync.status}'   # OutOfSync -> Synced
-kubectl -n casino get deploy                                                   # replicas reflect the commit
+It checks, writing evidence to `gitops/evidence/`:
+
+1. **Application Synced + Healthy** against the in-cluster Gitea repo.
+2. **A test commit triggers a sync that updates the cluster** — it adds a
+   throwaway `gitops-verify` ConfigMap via git, confirms it lands, then removes
+   it via git and confirms Argo CD prunes it. Non-invasive: the real casino
+   services are never touched.
+3. **Manifests are the single source of truth** — the synced repo carries every
+   canonical manifest from `deploy/casino/k8s` (ISI-6794), and the casino
+   workloads on the cluster are Argo CD-tracked (not hand-applied).
+
+Manual spot-check equivalents:
+
+```bash
+kubectl -n argocd get application casino     # SYNC: Synced   HEALTH: Healthy
+kubectl -n casino  get deploy                # casino workloads, Argo CD-managed
 ```
