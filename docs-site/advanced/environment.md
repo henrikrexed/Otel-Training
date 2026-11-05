@@ -78,7 +78,7 @@ flowchart LR
 
 Confirm the environment is live and see the planted issues you will fix:
 
-1. **Infrastructure → Kubernetes** — your cluster (by `KIND_CLUSTER_NAME`) is present.
+1. **Infrastructure → Kubernetes** — your cluster (by `PARTICIPANT_ID`) is present.
 2. **Distributed traces** — a trickle of casino traces is already flowing (k6 is
    playing for you). The casino's money-path (the actual spin/payout) is **not**
    visible yet — that is Step 1's job.

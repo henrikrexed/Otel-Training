@@ -27,7 +27,7 @@ your case is not here.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Nothing from your cluster in the tenant | Missing cluster filter — shared tenant! | Filter by `k8s.cluster.name` = your `KIND_CLUSTER_NAME` everywhere |
+| Nothing from your cluster in the tenant | Missing cluster filter — shared tenant! | Filter by `k8s.cluster.name` = your `PARTICIPANT_ID` everywhere |
 | Still nothing after filtering | Collector export broken | `kubectl -n observability logs deploy/otel-gateway-collector --tail=30` — look for `endpoint must be a valid URL` (tenant env missing) or 401/404 (token/tenant mismatch → check `DT_TENANT`/`DT_INGEST_TOKEN`) |
 | 404 on OTLP export | Wrong endpoint shape | Apps export to `otel-gateway-collector.observability.svc.cluster.local:4317` (gRPC, no path); the gateway exports to `${DT_TENANT}/api/v2/otlp` |
 | Config file edits do nothing (M2) | Env vars are ignored in file mode unless referenced `${}`; wrong `OTEL_CONFIG_FILE` path | Verify the mount (`kubectl -n casino exec deploy/vegas-casino-scoring -- cat /etc/otel/otel-config.yaml`) and the env var; check the agent picked up injection (annotation present on the *pod*, not the Deployment) |

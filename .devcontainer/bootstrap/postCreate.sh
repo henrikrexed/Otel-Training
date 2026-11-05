@@ -30,7 +30,7 @@ cat <<EOF
 
 ================================================================
  OTel Training devcontainer is ready.
- - kind cluster:  ${KIND_CLUSTER_NAME:-otel-training}
+ - kind cluster:  ${KIND_CLUSTER_NAME:-${PARTICIPANT_ID:-otel-training}}
  - cold start:    ${ELAPSED}s  (saved to $TIMING_FILE)
  Verify with:     kubectl get nodes   &&   dtctl version
  Next tickets build the casino app, observability stack, and

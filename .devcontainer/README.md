@@ -35,7 +35,8 @@ image. Full template in [`.env.example`](./.env.example).
 | `DT_TENANT` | Dynatrace tenant URL (e.g. `https://abc12345.live.dynatrace.com`) |
 | `DT_API_TOKEN` | API token for `dtctl` / config tooling (least-privilege) |
 | `DT_INGEST_TOKEN` | OTLP data-ingest token for collectors/operator |
-| `KIND_CLUSTER_NAME` | **unique per attendee** — drives cluster + `service.name` isolation |
+| `PARTICIPANT_ID` | **unique per attendee** — names the kind cluster, `k8s.cluster.name`, and DynaKube; drives `service.name` isolation. DNS-label-safe (lowercase alphanumeric + `-`). Blank → `otel-training` |
+| `KIND_CLUSTER_NAME` | advanced override — set to name the cluster directly; wins over `PARTICIPANT_ID`. Normally unset |
 
 To set them: GitHub → repo (or org) → **Settings → Secrets and variables →
 Codespaces** → add each as a Codespaces secret scoped to this repo. They surface

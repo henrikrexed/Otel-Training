@@ -6,7 +6,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLUSTER_NAME="${KIND_CLUSTER_NAME:-otel-training}"
+# PARTICIPANT_ID is the attendee-unique knob; KIND_CLUSTER_NAME still overrides
+# it (back-compat). Default stays otel-training when neither is set.
+CLUSTER_NAME="${KIND_CLUSTER_NAME:-${PARTICIPANT_ID:-otel-training}}"
 KIND_CONFIG="${KIND_CONFIG:-$SCRIPT_DIR/kind-config.yaml}"
 KUBECONFIG_PATH="${KUBECONFIG:-$HOME/.kube/config}"
 
