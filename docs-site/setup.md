@@ -13,7 +13,7 @@ and you can play the casino. Budget 15 minutes; helpers circulate.
 Your Codespace secrets were injected by the organizers. Check they are present:
 
 ```bash
-env | grep -E 'DT_TENANT|DT_API_TOKEN|DT_INGEST_TOKEN|KIND_CLUSTER_NAME' | cut -d= -f1
+env | grep -E 'DT_TENANT|DT_API_TOKEN|DT_INGEST_TOKEN|PARTICIPANT_ID' | cut -d= -f1
 ```
 
 Expected output: the four variable **names** (values stay hidden in lists):
@@ -22,14 +22,17 @@ Expected output: the four variable **names** (values stay hidden in lists):
 DT_TENANT
 DT_API_TOKEN
 DT_INGEST_TOKEN
-KIND_CLUSTER_NAME
+PARTICIPANT_ID
 ```
 
-!!! note "Your cluster name is your identity"
-    Everyone shares one Dynatrace tenant. `KIND_CLUSTER_NAME` is unique per
-    attendee and becomes `k8s.cluster.name` on every piece of telemetry you
-    send. **Always filter Dynatrace by your cluster name** — that is how you
-    see your casino and not your neighbor's.
+!!! note "Your `PARTICIPANT_ID` is your identity"
+    Everyone shares one Dynatrace tenant. `PARTICIPANT_ID` is the one value you
+    set to be unique: it names your kind cluster and becomes `k8s.cluster.name`
+    on every piece of telemetry you send. Keep it DNS-label-safe (lowercase
+    letters, digits, `-` — no spaces or uppercase). **Always filter Dynatrace by
+    your cluster name** — that is how you see your casino and not your
+    neighbor's. (Advanced: `KIND_CLUSTER_NAME` overrides it if you ever need to
+    name the cluster directly; most attendees never set it.)
 
 ## 2. Verify the kind cluster
 
@@ -37,7 +40,7 @@ KIND_CLUSTER_NAME
 kubectl get nodes
 ```
 
-Expected: one node named `<KIND_CLUSTER_NAME>-control-plane`, status `Ready`.
+Expected: one node named `<PARTICIPANT_ID>-control-plane`, status `Ready`.
 
 ```bash
 kubectl get pods -A
@@ -70,14 +73,14 @@ bash gitops/bootstrap/bootstrap-gitops.sh
 
 2. Sign in with the credentials from your handout.
 3. Go to **Infrastructure → Kubernetes** and confirm a cluster named after your
-   `KIND_CLUSTER_NAME` appears (first appearance can take a few minutes).
+   `PARTICIPANT_ID` appears (first appearance can take a few minutes).
 4. Open **Distributed traces**. You should see a trickle of traces from the
    casino already — the k6 load generator is playing the casino for you. The
    traces will look *broken*. That is intentional; it is Module 1's job.
 
 !!! tip "Filter by your cluster"
     In most Dynatrace views you can add a filter `k8s.cluster.name` =
-    your `KIND_CLUSTER_NAME`. Set it once, save the view — you will use it all
+    your `PARTICIPANT_ID`. Set it once, save the view — you will use it all
     day.
 
 ## 4. Open the GitOps loop

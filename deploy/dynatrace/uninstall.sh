@@ -6,7 +6,9 @@
 set -euo pipefail
 
 DT_NAMESPACE="${DT_NAMESPACE:-dynatrace}"
-DYNAKUBE_NAME="${DYNAKUBE_NAME:-${KIND_CLUSTER_NAME:-otel-training}}"
+# DYNAKUBE_NAME derives from KIND_CLUSTER_NAME, which derives from PARTICIPANT_ID
+# (set in .env); an explicit DYNAKUBE_NAME or KIND_CLUSTER_NAME still overrides.
+DYNAKUBE_NAME="${DYNAKUBE_NAME:-${KIND_CLUSTER_NAME:-${PARTICIPANT_ID:-otel-training}}}"
 
 log() { echo "==> $*"; }
 

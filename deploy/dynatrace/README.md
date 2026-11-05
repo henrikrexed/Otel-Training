@@ -65,7 +65,7 @@ Idempotent — safe to re-run (it `helm upgrade --install`s the operator and
 |---------|---------|---------|
 | `DT_OPERATOR_VERSION` | `1.11.1` | operator Helm chart version — confirm latest on the [releases page](https://github.com/Dynatrace/dynatrace-operator/releases) and bump (keep the DynaKube `apiVersion` in step — see notes) |
 | `DT_OPERATOR_CHART` | `oci://public.ecr.aws/dynatrace/dynatrace-operator` | chart ref (override for a mirror) |
-| `DYNAKUBE_NAME` | `$KIND_CLUSTER_NAME` or `otel-training` | per-attendee DynaKube + Secret name + tenant label |
+| `DYNAKUBE_NAME` | `$KIND_CLUSTER_NAME` → `$PARTICIPANT_ID` → `otel-training` | per-attendee DynaKube + Secret name + tenant label (derives from your `PARTICIPANT_ID`; `KIND_CLUSTER_NAME` overrides) |
 | `DT_NAMESPACE` | `dynatrace` | install namespace |
 
 ## Verify (acceptance criteria)

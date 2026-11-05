@@ -39,7 +39,8 @@
 #   GITLAB_TOKEN                attendee's GitLab token, injected as a Codespace
 #                                 secret (read_repository + write_repository)
 #   DT_TENANT / DT_API_TOKEN / DT_INGEST_TOKEN   tenant secrets (Codespaces secrets)
-#   KIND_CLUSTER_NAME           kind cluster / DynaKube name (default otel-training)
+#   PARTICIPANT_ID              attendee-unique id → kind cluster / DynaKube name
+#   KIND_CLUSTER_NAME           explicit override for the above (default otel-training)
 #
 # Graceful-degradation contract (AC #3): when DT_* are absent the cluster,
 # observability (no-export mode), and casino still come up. The script prints
@@ -52,7 +53,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # --- Config ------------------------------------------------------------------
 DEPLOY_MODE="${DEPLOY_MODE:-gitops}"
-KIND_CLUSTER_NAME="${KIND_CLUSTER_NAME:-otel-training}"
+KIND_CLUSTER_NAME="${KIND_CLUSTER_NAME:-${PARTICIPANT_ID:-otel-training}}"
 SKIP_DYNATRACE=""
 DO_RESET=""
 

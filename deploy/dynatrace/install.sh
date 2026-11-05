@@ -24,7 +24,7 @@ DT_OPERATOR_VERSION="${DT_OPERATOR_VERSION:-1.11.1}"
 DT_NAMESPACE="${DT_NAMESPACE:-dynatrace}"
 # Per-attendee DynaKube / Secret name. Defaults to the kind cluster name so the
 # tenant entities are labelled per attendee (matches ISI-4025 isolation decision).
-DYNAKUBE_NAME="${DYNAKUBE_NAME:-${KIND_CLUSTER_NAME:-otel-training}}"
+DYNAKUBE_NAME="${DYNAKUBE_NAME:-${KIND_CLUSTER_NAME:-${PARTICIPANT_ID:-otel-training}}}"
 export DYNAKUBE_NAME
 
 log()  { echo "==> $*"; }

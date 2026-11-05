@@ -88,8 +88,8 @@ You have not instrumented anything yet, so this checkpoint just proves the plumb
 1. `echo $DT_TENANT`, open the URL, and sign in with the credentials from your
    handout.
 2. Go to **Infrastructure → Kubernetes** and confirm a cluster named after your
-   `KIND_CLUSTER_NAME` appears (first appearance can take a few minutes).
-3. Set a filter `k8s.cluster.name` = your `KIND_CLUSTER_NAME` and save the view.
+   `PARTICIPANT_ID` appears (first appearance can take a few minutes).
+3. Set a filter `k8s.cluster.name` = your `PARTICIPANT_ID` and save the view.
    You will reuse it on every step.
 
 ## Definition of done
