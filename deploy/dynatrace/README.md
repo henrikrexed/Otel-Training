@@ -46,8 +46,15 @@ training teaches.
 - Tenant connection in the environment (devcontainer/Codespaces secrets — see
   [`.env.example`](../../.devcontainer/.env.example)):
   - `DT_TENANT` — tenant URL, e.g. `https://abc12345.live.dynatrace.com`
-  - `DT_API_TOKEN` — operator/ActiveGate API token (scopes below)
-  - `DT_INGEST_TOKEN` — data-ingest token
+  - `DT_OPERATOR_TOKEN` — operator/ActiveGate API token (classic `dt0c01`,
+    scopes below). *Renamed from `DT_API_TOKEN`; the old name is still accepted
+    by `install.sh` as a deprecated fallback.*
+  - `DT_INGEST_TOKEN` — data-ingest token (classic `dt0c01`; shared by the OTel
+    collectors and the operator `dataIngestToken`)
+
+  `dtctl` uses a **separate** platform token `DT_PLATFORM_TOKEN` (`dt0s16`) — it
+  is not read by this installer. See the canonical table in
+  [`docs-site/setup.md`](../../docs-site/setup.md#environment-variables).
 
 Tokens are read from the environment at install time and written only into an
 in-cluster Secret. **They are never baked into an image or committed.**
@@ -89,7 +96,7 @@ Then in the tenant open **Kubernetes** → the cluster appears as `<DYNAKUBE_NAM
 Create two tokens in the tenant (**Settings → Access tokens**). The operator uses
 them for exactly the Kubernetes-monitoring use case — no OneAgent/host scopes.
 
-**`DT_API_TOKEN`** (operator + ActiveGate):
+**`DT_OPERATOR_TOKEN`** (operator + ActiveGate; classic `dt0c01`):
 
 | Scope | ID | Why |
 |-------|----|----|
@@ -99,7 +106,8 @@ them for exactly the Kubernetes-monitoring use case — no OneAgent/host scopes.
 | Write settings | `settings.write` | create the K8s API monitoring setting (`automatic-kubernetes-api-monitoring`) |
 | Access problem/event feed, metrics, topology | `DataExport` | push K8s topology/events |
 
-**`DT_INGEST_TOKEN`** (data ingest):
+**`DT_INGEST_TOKEN`** (data ingest; classic `dt0c01`, two consumers — the OTel
+collectors' OTLP exporter **and** the operator `dataIngestToken`):
 
 | Scope | ID | Why |
 |-------|----|----|

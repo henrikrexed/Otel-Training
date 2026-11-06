@@ -30,13 +30,20 @@ cat ~/.otel-training-coldstart.txt   # -> recorded cold-start seconds
 Injected via **GitHub Codespaces secrets** — never committed, never baked into the
 image. Full template in [`.env.example`](./.env.example).
 
+One canonical table lives in
+[`docs-site/setup.md`](../../docs-site/setup.md#environment-variables); the
+summary below must agree with it.
+
 | Variable | Purpose |
 |----------|---------|
-| `DT_TENANT` | Dynatrace tenant URL (e.g. `https://abc12345.live.dynatrace.com`) |
-| `DT_API_TOKEN` | API token for `dtctl` / config tooling (least-privilege) |
-| `DT_INGEST_TOKEN` | OTLP data-ingest token for collectors/operator |
+| `DT_TENANT` | Dynatrace tenant URL (e.g. `https://abc12345.live.dynatrace.com`) — serves both the operator (`/api`) and OTLP collectors (`/api/v2/otlp`) |
+| `DT_OPERATOR_TOKEN` | operator / ActiveGate API token — classic `dt0c01`, operator scopes → DynaKube `apiToken` (renamed from `DT_API_TOKEN`, still accepted as a deprecated fallback) |
+| `DT_INGEST_TOKEN` | OTLP data-ingest token — classic `dt0c01`; two consumers, the collectors **and** the operator `dataIngestToken` |
+| `DT_PLATFORM_TOKEN` | platform token `dt0s16` used **only** by `dtctl` (optional; separate from `DT_OPERATOR_TOKEN`) |
+| `DT_PLATFORM_URL` | *(optional)* Gen3 SaaS apps URL for `dtctl` (`https://<id>.apps.dynatrace.com`); derivable from `DT_TENANT` |
 | `PARTICIPANT_ID` | **unique per attendee** — names the kind cluster, `k8s.cluster.name`, and DynaKube; drives `service.name` isolation. DNS-label-safe (lowercase alphanumeric + `-`). Blank → `otel-training` |
 | `KIND_CLUSTER_NAME` | advanced override — set to name the cluster directly; wins over `PARTICIPANT_ID`. Normally unset |
+| `WORKSHOP_DISPENSER_URL` / `WORKSHOP_ROOM_PASSWORD` | *(advanced track, opencode)* LLM dispenser — **not** Dynatrace tokens (ISI-7138) |
 
 To set them: GitHub → repo (or org) → **Settings → Secrets and variables →
 Codespaces** → add each as a Codespaces secret scoped to this repo. They surface
@@ -69,7 +76,8 @@ FORCE=1 bash .devcontainer/bootstrap/install-tools.sh
 ```
 
 > ℹ️ The public `Dynatrace/dtctl` release is correct for this training (tenant
-> wiring is done at runtime via `DT_TENANT` / `DT_API_TOKEN`). If Perform standardises
+> wiring is done at runtime via `DT_TENANT` / `DT_PLATFORM_TOKEN`, with an
+> optional `DT_PLATFORM_URL` for Gen3 SaaS). If Perform standardises
 > on a tenant- or region-specific dtctl mirror, set `DTCTL_DOWNLOAD_URL` as a
 > Codespaces secret / build arg to bake that exact binary instead.
 

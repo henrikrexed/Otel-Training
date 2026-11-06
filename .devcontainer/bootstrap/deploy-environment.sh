@@ -38,7 +38,9 @@
 #                                 (required when GITOPS_PROVIDER=gitlab)
 #   GITLAB_TOKEN                attendee's GitLab token, injected as a Codespace
 #                                 secret (read_repository + write_repository)
-#   DT_TENANT / DT_API_TOKEN / DT_INGEST_TOKEN   tenant secrets (Codespaces secrets)
+#   DT_TENANT / DT_OPERATOR_TOKEN / DT_INGEST_TOKEN   tenant secrets (Codespaces
+#                                 secrets; DT_API_TOKEN = deprecated alias for
+#                                 DT_OPERATOR_TOKEN, still accepted)
 #   PARTICIPANT_ID              attendee-unique id → kind cluster / DynaKube name
 #   KIND_CLUSTER_NAME           explicit override for the above (default otel-training)
 #
@@ -144,21 +146,24 @@ else
 fi
 
 # Classify the Dynatrace environment. Fully-configured => real export + DT phase.
+# DT_OPERATOR_TOKEN is the operator token; DT_API_TOKEN is a DEPRECATED fallback
+# (renamed in ISI-7165) so a not-yet-renamed Codespace secret still works.
 DT_TENANT="${DT_TENANT:-}"
-DT_API_TOKEN="${DT_API_TOKEN:-}"
+DT_OPERATOR_TOKEN="${DT_OPERATOR_TOKEN:-${DT_API_TOKEN:-}}"
 DT_INGEST_TOKEN="${DT_INGEST_TOKEN:-}"
 DT_READY=""
-if [[ "$DT_TENANT" == https://* && -n "$DT_API_TOKEN" && -n "$DT_INGEST_TOKEN" ]]; then
+if [[ "$DT_TENANT" == https://* && -n "$DT_OPERATOR_TOKEN" && -n "$DT_INGEST_TOKEN" ]]; then
   DT_READY=1
   ok "Dynatrace env present — full telemetry path enabled"
   log "tenant: ${DT_TENANT}"
 else
   warn "Dynatrace env incomplete — running in GRACEFUL-DEGRADATION mode"
-  [[ "$DT_TENANT" == https://* ]] || warn "  DT_TENANT missing or not an https:// URL"
-  [[ -n "$DT_API_TOKEN"   ]]      || warn "  DT_API_TOKEN missing"
-  [[ -n "$DT_INGEST_TOKEN" ]]     || warn "  DT_INGEST_TOKEN missing"
+  [[ "$DT_TENANT" == https://* ]]   || warn "  DT_TENANT missing or not an https:// URL"
+  [[ -n "$DT_OPERATOR_TOKEN" ]]      || warn "  DT_OPERATOR_TOKEN missing (DT_API_TOKEN accepted as deprecated fallback)"
+  [[ -n "$DT_INGEST_TOKEN" ]]        || warn "  DT_INGEST_TOKEN missing"
   log "cluster + observability + casino will still come up; tenant-side labs limited"
 fi
+export DT_OPERATOR_TOKEN
 
 log "deploy mode : ${DEPLOY_MODE}"
 log "cluster     : ${KIND_CLUSTER_NAME}"
@@ -338,7 +343,7 @@ if [[ -z "$DT_READY" ]]; then
   echo " ${YELLOW}Limited labs (no DT_* secrets):${RST}"
   echo "   - Dynatrace Kubernetes monitoring (M4) — operator not deployed"
   echo "   - reading casino signals in the tenant (M3/M5) — export disabled"
-  echo "   Set DT_TENANT / DT_API_TOKEN / DT_INGEST_TOKEN and re-run to enable."
+  echo "   Set DT_TENANT / DT_OPERATOR_TOKEN / DT_INGEST_TOKEN and re-run to enable."
 fi
 echo "${BOLD}================================================================${RST}"
 

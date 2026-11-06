@@ -20,15 +20,20 @@ following. The three Dynatrace values are injected as Codespace secrets by the
 organizers — you usually do **not** mint them yourself, but you should know what
 they are and how to check them.
 
+For the authoritative type/consumer of every Dynatrace variable, see the one
+canonical table in [M0 setup → Environment variables](../setup.md#environment-variables).
+The subset you need for this track:
+
 | Secret | What it is | Dynatrace docs |
 |---|---|---|
 | `DT_TENANT` | Your tenant URL, e.g. `https://abc12345.live.dynatrace.com` | [Environment / tenant](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
-| `DT_INGEST_TOKEN` | OTLP ingest token — scopes `openTelemetryTrace.ingest`, `metrics.ingest`, `logs.ingest` | [Create an API token](https://docs.dynatrace.com/docs/manage/access-control/access-tokens#create-api-token) |
-| `DT_API_TOKEN` | API token for Kubernetes monitoring (ActiveGate / operator) | [Access tokens](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
+| `DT_INGEST_TOKEN` | Classic API token (`dt0c01`) — OTLP ingest, scopes `openTelemetryTrace.ingest`, `metrics.ingest`, `logs.ingest` | [Create an API token](https://docs.dynatrace.com/docs/manage/access-control/access-tokens#create-api-token) |
+| `DT_OPERATOR_TOKEN` | Classic API token (`dt0c01`) for Kubernetes monitoring (ActiveGate / operator). *Renamed from `DT_API_TOKEN`, still accepted as a deprecated fallback.* | [Access tokens](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
+| `DT_PLATFORM_TOKEN` | *(optional)* Platform token (`dt0s16`) used **only** by `dtctl` — a different token type from the two above | [Platform tokens](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
 | `GITLAB_REPO_URL` | HTTPS URL of **your** casino fork (see step 2) | — |
 | `GITLAB_TOKEN` | Token scoped to your fork (`read_repository` + `write_repository`) | [GitLab access tokens](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) |
-| `WORKSHOP_DISPENSER_URL` | Endpoint that mints your per-attendee LLM proxy key (for `opencode` in Step 1) | — |
-| `WORKSHOP_ROOM_PASSWORD` | Shared room password sent to the dispenser | — |
+| `WORKSHOP_DISPENSER_URL` | Endpoint that mints your per-attendee LLM proxy key (for `opencode` in Step 1) — **not** a Dynatrace token | — |
+| `WORKSHOP_ROOM_PASSWORD` | Shared room password sent to the dispenser — **not** a Dynatrace token | — |
 
 !!! note "The two `WORKSHOP_*` secrets are only for Step 1"
     They wire the `opencode` AI coding agent to a facilitator-hosted LLM proxy.
@@ -36,6 +41,14 @@ they are and how to check them.
     AI-agent instrumentation flow is unavailable (post-create setup says so and
     moves on). Your per-attendee budget is enforced on the proxy; there is
     nothing to configure for it locally.
+
+!!! info "Davis CoPilot (optional) — a separate OAuth client"
+    If your cohort runs the optional **Davis CoPilot** exercise, it uses a
+    Dynatrace **OAuth client** (`dt0s02`), *not* any of the tokens above. It is
+    kept deliberately separate from the required DT token set and is only wired
+    when that exercise is in scope. Nothing on the main M0–M5 path or in this
+    track's required steps needs it, so skip it unless a facilitator says
+    otherwise.
 
 !!! note "You never paste a token into the repo"
     Tokens live only as Codespace secrets and are read at runtime. Nothing is
@@ -103,7 +116,7 @@ You have not instrumented anything yet, so this checkpoint just proves the plumb
 
 ## Definition of done
 
-- [ ] You can name all five secrets and what each is for
+- [ ] You can name the secrets in the table above and what each is for
 - [ ] You own a fork `https://<gitlab-host>/<attendee>/casino`
 - [ ] `GITLAB_REPO_URL` and `GITLAB_TOKEN` are set as Codespace secrets
 - [ ] The Codespace is created on `main` and post-create setup finished

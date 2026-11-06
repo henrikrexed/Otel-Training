@@ -13,17 +13,23 @@ and you can play the casino. Budget 15 minutes; helpers circulate.
 Your Codespace secrets were injected by the organizers. Check they are present:
 
 ```bash
-env | grep -E 'DT_TENANT|DT_API_TOKEN|DT_INGEST_TOKEN|PARTICIPANT_ID' | cut -d= -f1
+env | grep -E 'DT_TENANT|DT_OPERATOR_TOKEN|DT_INGEST_TOKEN|PARTICIPANT_ID' | cut -d= -f1
 ```
 
 Expected output: the four variable **names** (values stay hidden in lists):
 
 ```
 DT_TENANT
-DT_API_TOKEN
+DT_OPERATOR_TOKEN
 DT_INGEST_TOKEN
 PARTICIPANT_ID
 ```
+
+!!! note "Renamed from `DT_API_TOKEN`"
+    The operator token is now `DT_OPERATOR_TOKEN`. If your Codespace secret is
+    still named `DT_API_TOKEN`, bring-up continues (the installer accepts it as a
+    deprecated fallback) — but rename the secret when you can. See the full
+    contract in [Environment variables](#environment-variables) below.
 
 !!! note "Your `PARTICIPANT_ID` is your identity"
     Everyone shares one Dynatrace tenant. `PARTICIPANT_ID` is the one value you
@@ -51,6 +57,43 @@ PARTICIPANT_ID
     `WORKSHOP_*` secrets were absent, or the dispenser was unreachable — see
     [Troubleshooting](troubleshooting.md#workshop-llm-proxy-opencode). The M0–M5
     modules do **not** need `opencode`, so you can ignore this on the main track.
+
+## Environment variables
+
+This is the **one canonical contract** for every variable the training consumes.
+`.env.sample` and `.devcontainer/.env.example` mirror it — if anything disagrees,
+this table wins.
+
+| Variable | Type | Consumed by | Required? |
+|---|---|---|---|
+| `DT_TENANT` | Tenant base URL (`https://<id>.live.dynatrace.com`) | Operator (`<DT_TENANT>/api`) **and** OTel collectors (`<DT_TENANT>/api/v2/otlp`) — one URL, two uses | Required for all Dynatrace labs |
+| `DT_OPERATOR_TOKEN` | Classic API token (`dt0c01`), operator scopes | Dynatrace Operator → DynaKube `apiToken` (`deploy/dynatrace/install.sh`) | Required for K8s monitoring (M4) |
+| `DT_INGEST_TOKEN` | Classic API token (`dt0c01`), ingest scopes | **Two** consumers: OTel collectors' OTLP exporter **and** operator `dataIngestToken` | Required for telemetry export (M3/M5) |
+| `DT_PLATFORM_TOKEN` | Platform token (`dt0s16`) | `dtctl` **only** — never the operator | Optional (dtctl labs) |
+| `DT_PLATFORM_URL` | Gen3 SaaS apps URL (`https://<id>.apps.dynatrace.com`) | `dtctl` on Gen3 SaaS | Optional — derived from `DT_TENANT` when unset |
+| `PARTICIPANT_ID` | DNS-label-safe id | kind cluster name, `k8s.cluster.name`, DynaKube name | Required (blank → `otel-training`, collides in a class) |
+| `KIND_CLUSTER_NAME` | cluster name | advanced override; wins over `PARTICIPANT_ID` | Optional |
+
+!!! warning "`DT_OPERATOR_TOKEN` and `DT_PLATFORM_TOKEN` are different tokens"
+    They are not interchangeable. `DT_OPERATOR_TOKEN` is a **classic** API token
+    (`dt0c01`) the Kubernetes operator uses; `DT_PLATFORM_TOKEN` is a **platform**
+    token (`dt0s16`) only `dtctl` uses. Minting one where the other is expected
+    will fail auth. The old single `DT_API_TOKEN` is a deprecated alias for
+    `DT_OPERATOR_TOKEN` only.
+
+Two variables below are **not** Dynatrace tokens — they belong to the advanced
+track's `opencode` LLM dispenser (unrelated to the DT tenant):
+
+| Variable | Type | Consumed by | Required? |
+|---|---|---|---|
+| `WORKSHOP_DISPENSER_URL` | URL | `dispense-llm.sh` → `opencode` LLM proxy key | Optional (advanced Step 1 only) |
+| `WORKSHOP_ROOM_PASSWORD` | shared secret (`X-Room-Password`) | `dispense-llm.sh` → dispenser auth | Optional (advanced Step 1 only) |
+
+!!! info "Davis CoPilot / OAuth (optional, not required)"
+    If your cohort runs the optional **Davis CoPilot** exercise it uses a separate
+    Dynatrace **OAuth client** (`dt0s02`), configured in its own
+    [advanced section](advanced/getting-started.md) — it is deliberately kept out
+    of the required token set above. Most attendees do not need it.
 
 ## 2. Verify the kind cluster
 

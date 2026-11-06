@@ -36,7 +36,7 @@ spec:
   apiUrl: ${DT_API_URL}
 
   # Name of the Secret (same namespace) holding `apiToken` and `dataIngestToken`.
-  # Created by install.sh from DT_API_TOKEN / DT_INGEST_TOKEN. By convention the
+  # Created by install.sh from DT_OPERATOR_TOKEN / DT_INGEST_TOKEN. By convention the
   # operator looks for a Secret named after the DynaKube when `tokens` is unset;
   # we set it explicitly for clarity.
   tokens: ${DYNAKUBE_NAME}
