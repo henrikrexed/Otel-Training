@@ -3,5 +3,8 @@
 /.env
 .devcontainer/.env
 
+# workshop LLM proxy credential minted by dispense-llm.sh — holds a live key.
+.workshop-llm.env
+
 # mkdocs build output
 site/

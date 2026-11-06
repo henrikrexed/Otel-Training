@@ -16,6 +16,13 @@ log() { echo "==> $*"; }
 log "verifying toolchain (self-heal if needed)"
 bash "$SCRIPT_DIR/install-tools.sh"
 
+# Mint the workshop LLM proxy credential and point opencode at it BEFORE the
+# stack comes up, so the advanced instrumentation lab has its AI agent ready.
+# dispense-llm.sh is non-fatal and self-skips when the WORKSHOP_* secrets are
+# absent (i.e. outside the facilitated workshop), so this never blocks bring-up.
+log "wiring the workshop LLM proxy (opencode)"
+bash "$SCRIPT_DIR/dispense-llm.sh" || log "WARN: dispense-llm.sh reported an issue; opencode AI steps may be unavailable (non-fatal)."
+
 log "standing up kind cluster"
 bash "$SCRIPT_DIR/create-cluster.sh"
 
@@ -32,7 +39,7 @@ cat <<EOF
  OTel Training devcontainer is ready.
  - kind cluster:  ${KIND_CLUSTER_NAME:-${PARTICIPANT_ID:-otel-training}}
  - cold start:    ${ELAPSED}s  (saved to $TIMING_FILE)
- Verify with:     kubectl get nodes   &&   dtctl version
+ Verify with:     kubectl get nodes   &&   dtctl version   &&   opencode --version
  Next tickets build the casino app, observability stack, and
  Dynatrace operator on top of this base.
 ================================================================
