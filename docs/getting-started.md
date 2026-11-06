@@ -11,16 +11,14 @@ the below credentials and settings.
 to generate [other tokens used in this demo](https://github.com/Dynatrace/obslab-predictive-kubernetes-scaling/blob/main/dynatrace/tokens.tf){target="_blank"}. Permissions:
     - `apiTokens.read`
     - `apiTokens.write`
-- A [Dynatrace OAuth 2.0 client](https://docs.dynatrace.com/docs/platform-modules/automations/cloud-automation/setup-cloud-automation/authentication#client){target="_blank"}
-to deploy the workflows and notebook used in this demo. Permissions:
+- **Optional — Davis CoPilot (advanced).** A [Dynatrace OAuth 2.0 client](https://docs.dynatrace.com/docs/platform-modules/automations/cloud-automation/setup-cloud-automation/authentication#client){target="_blank"}
+is **not required** for the core observability bring-up (cluster monitoring, workflows and notebook deploy via the API
+and platform tokens above). Provide it **only** if you want the advanced Davis CoPilot
+features. When supplied, give the client secret (`dt0s02.<id>.<secret>`) — the client id is derived from it. Permissions:
     - `app-settings:objects:read` 
     - `automation:workflows:write`
     - `automation:workflows:read`
     - `automation:workflows:run`  
-    - `app-engine:edge-connects:connect`
-    - `app-engine:edge-connects:write`
-    - `app-engine:edge-connects:read`
-    - `app-engine:edge-connects:delete`
     - `davis-copilot:conversations:execute`  
     - `davis-copilot:nl2dql:execute` 
     - `davis-copilot:dql2nl:execute`
@@ -140,6 +138,7 @@ to read more about timeout periods for Codespaces and how to configure them.
     set DYNATRACE_ENVIRONMENT=live
     set DYNATRACE_API_TOKEN=dt0c01.******.***********
     set DYNATRACE_PLATFORM_TOKEN=dt0c01.******.***********
+    # Optional — only for the advanced Davis CoPilot features:
     set DYNATRACE_OAUTH_CLIENT_SECRET=dt0s02.******.***********
     ```
 

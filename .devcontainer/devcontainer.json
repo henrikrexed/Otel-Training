@@ -42,9 +42,6 @@
 		  "DYNATRACE_PLATFORM_TOKEN": {
 			"description": "Dynatrace platform token with permission `davis-copilot:conversations:execute`. This permission must be granted via IAM: create (or reuse) a policy containing the statement `ALLOW davis-copilot:conversations:execute;`, bind it to a group, and assign your user to that group (see docs/getting-started.md for the step-by-step)."
 		  },
-		  "DYNATRACE_OAUTH_CLIENT_SECRET": {
-			"description": "Dynatrace OAuth client secret (form `dt0s02.<id>.<secret>`). The OAuth client id is derived from this value in init.sh, so it is not prompted separately. Required permissions (complete list, must match docs/getting-started.md): `app-settings:objects:read`, `automation:workflows:write`, `automation:workflows:read`, `automation:workflows:run`, `app-engine:edge-connects:connect`, `app-engine:edge-connects:write`, `app-engine:edge-connects:read`, `app-engine:edge-connects:delete`, `davis-copilot:conversations:execute`, `davis-copilot:nl2dql:execute`, `davis-copilot:dql2nl:execute`, `davis:analyzers:read`, `davis:analyzers:execute`, `email:emails:send`, `document:documents:write`, `document:documents:read`, `document:documents:delete`, `oauth2:clients:manage`, `settings:objects:read`, `settings:objects:write`, `storage:buckets:read`, `storage:logs:read`, `storage:metrics:read`, `storage:bizevents:read`, `storage:spans:read`, `storage:entities:read`, `storage:events:read`, `storage:security.events:read`, `storage:system:read`, `storage:user.events:read`, `storage:user.sessions:read`, `storage:smartscape:read`, `storage:events:write`."
-		  },
 		  "DYNATRACE_ACCOUNT_ID": {
 			"description": "Dynatrace account id"
 		  }

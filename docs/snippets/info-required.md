@@ -6,6 +6,8 @@ The codespace will require to define several details:
     * Operator API Token
     * Ingest API Token
     * Cluster Name
-    * The Oauth Client ID
-    * The Oauth Client Secret
-    * the Oauth Client URN
+
+The following is **optional** and only needed for the advanced Davis CoPilot
+features — the core observability bring-up does not require it:
+
+    * The Dynatrace OAuth Client Secret (`dt0s02.<id>.<secret>`)
