@@ -46,14 +46,15 @@ training teaches.
 - Tenant connection in the environment (devcontainer/Codespaces secrets — see
   [`.env.example`](../../.devcontainer/.env.example)):
   - `DT_TENANT` — tenant URL, e.g. `https://abc12345.live.dynatrace.com`
-  - `DT_OPERATOR_TOKEN` — operator/ActiveGate API token (classic `dt0c01`,
-    scopes below). *Renamed from `DT_API_TOKEN`; the old name is still accepted
-    by `install.sh` as a deprecated fallback.*
-  - `DT_INGEST_TOKEN` — data-ingest token (classic `dt0c01`; shared by the OTel
-    collectors and the operator `dataIngestToken`)
+  - `DT_OPERATOR_TOKEN` — operator/ActiveGate **platform token** (`dt0s16`,
+    IAM scopes below). *Renamed from `DT_API_TOKEN`; the old name is still
+    accepted by `install.sh` as a deprecated fallback.*
+  - `DT_INGEST_TOKEN` — data-ingest **platform token** (`dt0s16`; shared by the
+    OTel collectors and the operator `dataIngestToken`)
 
-  `dtctl` uses a **separate** platform token `DT_PLATFORM_TOKEN` (`dt0s16`) — it
-  is not read by this installer. See the canonical table in
+  All three operator-facing tokens are now **platform tokens** (this is a Gen3
+  tenant). `dtctl` uses its own platform token `DT_PLATFORM_TOKEN` (`dt0s16`) —
+  it is not read by this installer. See the canonical table in
   [`docs-site/setup.md`](../../docs-site/setup.md#environment-variables).
 
 Tokens are read from the environment at install time and written only into an
@@ -93,31 +94,46 @@ Then in the tenant open **Kubernetes** → the cluster appears as `<DYNAKUBE_NAM
 
 ## Token scopes (least-privilege)
 
-Create two tokens in the tenant (**Settings → Access tokens**). The operator uses
-them for exactly the Kubernetes-monitoring use case — no OneAgent/host scopes.
+Create two **platform tokens** in the tenant (**Account Management → Identity &
+access management → Platform tokens**, or via the in-product *Generate token*
+step — on Latest/Gen3 environments the operator install flow mints a platform
+token). These carry **IAM scopes**, not the classic `dt0c01` access-token
+scopes. The operator uses them for exactly the Kubernetes-monitoring use case —
+no OneAgent/host scopes.
 
-**`DT_OPERATOR_TOKEN`** (operator + ActiveGate; classic `dt0c01`):
+> **Operator version:** platform-token support landed in Dynatrace Operator
+> **1.10.0**; `install.sh` pins **1.11.1**, so no bump is required. The token
+> Secret shape is unchanged (`apiToken` / `dataIngestToken` keys) — the operator
+> auto-detects the token type by prefix (`dt0s16` platform vs `dt0c01` classic),
+> and still accepts classic tokens during migration.
 
-| Scope | ID | Why |
-|-------|----|----|
-| Create ActiveGate tokens | `activeGateTokenManagement.create` | operator provisions the AG auth token |
-| Read entities | `entities.read` | map K8s entities |
-| Read settings | `settings.read` | read monitoring settings |
-| Write settings | `settings.write` | create the K8s API monitoring setting (`automatic-kubernetes-api-monitoring`) |
-| Access problem/event feed, metrics, topology | `DataExport` | push K8s topology/events |
+**`DT_OPERATOR_TOKEN`** (operator + ActiveGate; **platform token** `dt0s16`):
 
-**`DT_INGEST_TOKEN`** (data ingest; classic `dt0c01`, two consumers — the OTel
-collectors' OTLP exporter **and** the operator `dataIngestToken`):
+| Scope |
+|-------|
+| `fleet-management:activegate.connection-info:read` |
+| `fleet-management:activegate.tokens:create` |
+| `fleet-management:container-images:read` |
+| `fleet-management:oneagent.connection-info:read` |
+| `fleet-management:oneagents:download` |
+| `settings:objects:read` |
+| `settings:objects:write` |
 
-| Scope | ID | Why |
-|-------|----|----|
-| Ingest metrics | `metrics.ingest` | K8s metrics |
-| Ingest logs | `logs.ingest` | (optional) K8s/platform logs |
-| Ingest events | `events.ingest` | (optional) K8s events |
+**`DT_INGEST_TOKEN`** (data ingest; **platform token** `dt0s16`, two consumers —
+the OTel collectors' OTLP exporter **and** the operator `dataIngestToken`):
 
-> Deliberately **excluded**: OneAgent installer download, PaaS token, host/process
-> scopes — not needed in Kubernetes-monitoring mode and kept out to stay
-> least-privilege on a shared tenant.
+| Scope | Why |
+|-------|-----|
+| `openpipeline:traces:ingest` | OTLP traces (OpenTelemetry) |
+| `openpipeline:metrics:ingest` | OTLP metrics + K8s metrics |
+| `openpipeline:logs:ingest` | OTLP logs + K8s/platform logs |
+| `openpipeline:events:ingest` | OTel/K8s events ingest |
+| `storage:metrics:write` | write ingested metrics to Grail |
+
+> Deliberately **excluded**: OneAgent installer download beyond the operator
+> scopes above, PaaS token, host/process full-stack scopes — not needed in
+> Kubernetes-monitoring mode and kept out to stay least-privilege on a shared
+> tenant.
 
 ## Uninstall
 

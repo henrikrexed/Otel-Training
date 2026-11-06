@@ -11,12 +11,16 @@
 #   6. waits for the operator + ActiveGate to become healthy.
 #
 # Token model (see docs-site/setup.md "Environment variables" for the one
-# canonical table):
-#   DT_OPERATOR_TOKEN  classic API token (dt0c01), operator scopes -> DynaKube
-#                      apiToken. Renamed from DT_API_TOKEN (still honoured as a
-#                      deprecated fallback below).
-#   DT_INGEST_TOKEN    classic API token (dt0c01), ingest scopes -> DynaKube
-#                      dataIngestToken (and the OTel collectors' OTLP exporter).
+# canonical table). Both are PLATFORM tokens (dt0s16) — this is a Gen3 tenant.
+# Platform-token support landed in operator 1.10.0; the pinned 1.11.1 supports
+# it, and the Secret keys are unchanged (apiToken/dataIngestToken) — the operator
+# auto-detects the token type by prefix.
+#   DT_OPERATOR_TOKEN  platform token (dt0s16), fleet-management + settings IAM
+#                      scopes -> DynaKube apiToken. Renamed from DT_API_TOKEN
+#                      (still honoured as a deprecated fallback below).
+#   DT_INGEST_TOKEN    platform token (dt0s16), openpipeline + storage IAM scopes
+#                      -> DynaKube dataIngestToken (and the OTel collectors' OTLP
+#                      exporter, which sends it as a Bearer token).
 #
 # Tokens are read from the environment (devcontainer/Codespaces secrets) and are
 # NEVER written to disk or baked into an image.
@@ -28,6 +32,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Dynatrace Operator Helm chart (OCI). Pin a version; confirm the latest at
 # https://github.com/Dynatrace/dynatrace-operator/releases and bump as needed.
 DT_OPERATOR_CHART="${DT_OPERATOR_CHART:-oci://public.ecr.aws/dynatrace/dynatrace-operator}"
+# 1.11.1 >= 1.10.0, the first release to accept PLATFORM tokens (dt0s16) in the
+# apiToken/dataIngestToken Secret keys. Do not drop below 1.10.0 or platform
+# tokens will fail validation.
 DT_OPERATOR_VERSION="${DT_OPERATOR_VERSION:-1.11.1}"
 DT_NAMESPACE="${DT_NAMESPACE:-dynatrace}"
 # Per-attendee DynaKube / Secret name. Defaults to the kind cluster name so the

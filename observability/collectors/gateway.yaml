@@ -121,7 +121,12 @@ spec:
       otlphttp/dynatrace:
         endpoint: ${env:DT_TENANT}/api/v2/otlp
         headers:
-          Authorization: "Api-Token ${env:DT_INGEST_TOKEN}"
+          # DT_INGEST_TOKEN is a PLATFORM token (dt0s16) on this Gen3 tenant, so
+          # the OTLP endpoint expects `Bearer <token>` — NOT the classic
+          # `Api-Token <token>` header (that is only for dt0c01 access tokens).
+          # Required platform scopes: openpipeline:{traces,metrics,logs,events}:ingest
+          # + storage:metrics:write. See docs-site/setup.md "Environment variables".
+          Authorization: "Bearer ${env:DT_INGEST_TOKEN}"
         tls:
           # GOTCHA (found in live verification, ISI-6806): `insecure_skip_verify`
           # is a bool field — the collector's config decoder rejects env-expanded

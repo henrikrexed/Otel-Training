@@ -27,9 +27,9 @@ The subset you need for this track:
 | Secret | What it is | Dynatrace docs |
 |---|---|---|
 | `DT_TENANT` | Your tenant URL, e.g. `https://abc12345.live.dynatrace.com` | [Environment / tenant](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
-| `DT_INGEST_TOKEN` | Classic API token (`dt0c01`) — OTLP ingest, scopes `openTelemetryTrace.ingest`, `metrics.ingest`, `logs.ingest` | [Create an API token](https://docs.dynatrace.com/docs/manage/access-control/access-tokens#create-api-token) |
-| `DT_OPERATOR_TOKEN` | Classic API token (`dt0c01`) for Kubernetes monitoring (ActiveGate / operator). *Renamed from `DT_API_TOKEN`, still accepted as a deprecated fallback.* | [Access tokens](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
-| `DT_PLATFORM_TOKEN` | *(optional)* Platform token (`dt0s16`) used **only** by `dtctl` — a different token type from the two above | [Platform tokens](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
+| `DT_INGEST_TOKEN` | Platform token (`dt0s16`) — OTLP ingest, scopes `openpipeline:{traces,metrics,logs,events}:ingest` + `storage:metrics:write` | [Platform tokens](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
+| `DT_OPERATOR_TOKEN` | Platform token (`dt0s16`) for Kubernetes monitoring (ActiveGate / operator) — `fleet-management:*` + `settings:objects:*`. *Renamed from `DT_API_TOKEN`, still accepted as a deprecated fallback.* | [Platform tokens](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
+| `DT_PLATFORM_TOKEN` | *(optional)* Platform token (`dt0s16`) used **only** by `dtctl` — same token *type* as the two above but a distinct scope set | [Platform tokens](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
 | `GITLAB_REPO_URL` | HTTPS URL of **your** casino fork (see step 2) | — |
 | `GITLAB_TOKEN` | Token scoped to your fork (`read_repository` + `write_repository`) | [GitLab access tokens](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) |
 | `WORKSHOP_DISPENSER_URL` | Endpoint that mints your per-attendee LLM proxy key (for `opencode` in Step 1) — **not** a Dynatrace token | — |

@@ -126,7 +126,7 @@ defect they hunt in the casino's planted broken config.
 | Variable | Where | Used by |
 |----------|-------|---------|
 | `DT_TENANT` | Codespaces secret → `dynatrace-otel` | gateway exporter endpoint |
-| `DT_INGEST_TOKEN` | Codespaces secret → `dynatrace-otel` | `Api-Token` auth header |
+| `DT_INGEST_TOKEN` | Codespaces secret → `dynatrace-otel` | OTLP `Bearer` auth header (platform token, `dt0s16`) |
 
 Note: there is **no** `DT_INSECURE_SKIP_VERIFY` — `tls.insecure_skip_verify`
 is a bool field and the collector rejects env-expanded strings there

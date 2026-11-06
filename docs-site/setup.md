@@ -67,19 +67,23 @@ this table wins.
 | Variable | Type | Consumed by | Required? |
 |---|---|---|---|
 | `DT_TENANT` | Tenant base URL (`https://<id>.live.dynatrace.com`) | Operator (`<DT_TENANT>/api`) **and** OTel collectors (`<DT_TENANT>/api/v2/otlp`) — one URL, two uses | Required for all Dynatrace labs |
-| `DT_OPERATOR_TOKEN` | Classic API token (`dt0c01`), operator scopes | Dynatrace Operator → DynaKube `apiToken` (`deploy/dynatrace/install.sh`) | Required for K8s monitoring (M4) |
-| `DT_INGEST_TOKEN` | Classic API token (`dt0c01`), ingest scopes | **Two** consumers: OTel collectors' OTLP exporter **and** operator `dataIngestToken` | Required for telemetry export (M3/M5) |
+| `DT_OPERATOR_TOKEN` | **Platform token** (`dt0s16`), `fleet-management:*` + `settings:objects:*` scopes | Dynatrace Operator → DynaKube `apiToken` (`deploy/dynatrace/install.sh`) | Required for K8s monitoring (M4) |
+| `DT_INGEST_TOKEN` | **Platform token** (`dt0s16`), `openpipeline:{traces,metrics,logs,events}:ingest` + `storage:metrics:write` | **Two** consumers: OTel collectors' OTLP exporter (`Bearer` header) **and** operator `dataIngestToken` | Required for telemetry export (M3/M5) |
 | `DT_PLATFORM_TOKEN` | Platform token (`dt0s16`) | `dtctl` **only** — never the operator | Optional (dtctl labs) |
 | `DT_PLATFORM_URL` | Gen3 SaaS apps URL (`https://<id>.apps.dynatrace.com`) | `dtctl` on Gen3 SaaS | Optional — derived from `DT_TENANT` when unset |
 | `PARTICIPANT_ID` | DNS-label-safe id | kind cluster name, `k8s.cluster.name`, DynaKube name | Required (blank → `otel-training`, collides in a class) |
 | `KIND_CLUSTER_NAME` | cluster name | advanced override; wins over `PARTICIPANT_ID` | Optional |
 
-!!! warning "`DT_OPERATOR_TOKEN` and `DT_PLATFORM_TOKEN` are different tokens"
-    They are not interchangeable. `DT_OPERATOR_TOKEN` is a **classic** API token
-    (`dt0c01`) the Kubernetes operator uses; `DT_PLATFORM_TOKEN` is a **platform**
-    token (`dt0s16`) only `dtctl` uses. Minting one where the other is expected
-    will fail auth. The old single `DT_API_TOKEN` is a deprecated alias for
-    `DT_OPERATOR_TOKEN` only.
+!!! warning "The three `DT_*` tokens are all platform tokens but **not** interchangeable"
+    On this Gen3 tenant `DT_OPERATOR_TOKEN`, `DT_INGEST_TOKEN`, and
+    `DT_PLATFORM_TOKEN` are all **platform tokens** (`dt0s16`) — but each carries a
+    **different scope set** and is minted separately: the operator token needs
+    `fleet-management:*` + `settings:objects:*`, the ingest token needs
+    `openpipeline:*:ingest` + `storage:metrics:write`, and `DT_PLATFORM_TOKEN` is
+    used only by `dtctl`. Minting one where another is expected will fail auth.
+    The old single `DT_API_TOKEN` is a deprecated alias for `DT_OPERATOR_TOKEN`
+    only. (The Dynatrace **Operator ≥ 1.10.0** is what accepts platform tokens in
+    the `apiToken`/`dataIngestToken` Secret keys; `install.sh` pins `1.11.1`.)
 
 Two variables below are **not** Dynatrace tokens — they belong to the advanced
 track's `opencode` LLM dispenser (unrelated to the DT tenant):
