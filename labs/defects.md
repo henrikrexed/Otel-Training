@@ -163,7 +163,7 @@ spec:
     otlp:
       endpoint: "${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4317}"
       headers:
-        authorization: "Api-Token ${DT_API_TOKEN}"
+        authorization: "Bearer ${DT_INGEST_TOKEN}"   # platform token (dt0s16) → Bearer, not Api-Token
 ```
 
 #### Expected Dynatrace Evidence:

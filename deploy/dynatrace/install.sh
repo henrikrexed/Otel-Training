@@ -6,9 +6,21 @@
 #   1. validates the per-attendee DT_* env is present,
 #   2. creates the `dynatrace` namespace,
 #   3. installs/upgrades the operator via Helm (OCI chart), CSI driver OFF,
-#   4. creates/updates the token Secret from DT_API_TOKEN / DT_INGEST_TOKEN,
+#   4. creates/updates the token Secret from DT_OPERATOR_TOKEN / DT_INGEST_TOKEN,
 #   5. renders dynakube.yaml (envsubst) and applies it,
 #   6. waits for the operator + ActiveGate to become healthy.
+#
+# Token model (see docs-site/setup.md "Environment variables" for the one
+# canonical table). Both are PLATFORM tokens (dt0s16) — this is a Gen3 tenant.
+# Platform-token support landed in operator 1.10.0; the pinned 1.11.1 supports
+# it, and the Secret keys are unchanged (apiToken/dataIngestToken) — the operator
+# auto-detects the token type by prefix.
+#   DT_OPERATOR_TOKEN  platform token (dt0s16), fleet-management + settings IAM
+#                      scopes -> DynaKube apiToken. Renamed from DT_API_TOKEN
+#                      (still honoured as a deprecated fallback below).
+#   DT_INGEST_TOKEN    platform token (dt0s16), openpipeline + storage IAM scopes
+#                      -> DynaKube dataIngestToken (and the OTel collectors' OTLP
+#                      exporter, which sends it as a Bearer token).
 #
 # Tokens are read from the environment (devcontainer/Codespaces secrets) and are
 # NEVER written to disk or baked into an image.
@@ -20,6 +32,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Dynatrace Operator Helm chart (OCI). Pin a version; confirm the latest at
 # https://github.com/Dynatrace/dynatrace-operator/releases and bump as needed.
 DT_OPERATOR_CHART="${DT_OPERATOR_CHART:-oci://public.ecr.aws/dynatrace/dynatrace-operator}"
+# 1.11.1 >= 1.10.0, the first release to accept PLATFORM tokens (dt0s16) in the
+# apiToken/dataIngestToken Secret keys. Do not drop below 1.10.0 or platform
+# tokens will fail validation.
 DT_OPERATOR_VERSION="${DT_OPERATOR_VERSION:-1.11.1}"
 DT_NAMESPACE="${DT_NAMESPACE:-dynatrace}"
 # Per-attendee DynaKube / Secret name. Defaults to the kind cluster name so the
@@ -35,8 +50,17 @@ need kubectl
 need helm
 
 # --- 1. Validate tenant connection env -------------------------------------
+# DT_OPERATOR_TOKEN is the operator/ActiveGate API token (DynaKube apiToken).
+# DEPRECATED: the old name DT_API_TOKEN is still accepted as a fallback so an
+# existing secret does not break mid-training — remove it once every attendee
+# secret is renamed. This is the only place DT_API_TOKEN is read.
+if [[ -z "${DT_OPERATOR_TOKEN:-}" && -n "${DT_API_TOKEN:-}" ]]; then
+  log "note: DT_API_TOKEN is deprecated — rename it to DT_OPERATOR_TOKEN"
+fi
+DT_OPERATOR_TOKEN="${DT_OPERATOR_TOKEN:-${DT_API_TOKEN:-}}"
+
 : "${DT_TENANT:?set DT_TENANT to your tenant URL, e.g. https://abc12345.live.dynatrace.com}"
-: "${DT_API_TOKEN:?set DT_API_TOKEN (operator/ActiveGate API token — see README token scopes)}"
+: "${DT_OPERATOR_TOKEN:?set DT_OPERATOR_TOKEN (operator/ActiveGate API token — see README token scopes)}"
 : "${DT_INGEST_TOKEN:?set DT_INGEST_TOKEN (data-ingest token)}"
 
 # Normalise apiUrl: strip trailing slash, ensure it ends with /api.
@@ -71,7 +95,7 @@ helm upgrade --install dynatrace-operator "$DT_OPERATOR_CHART" \
 log "creating/updating token Secret '$DYNAKUBE_NAME'"
 kubectl create secret generic "$DYNAKUBE_NAME" \
   --namespace "$DT_NAMESPACE" \
-  --from-literal=apiToken="$DT_API_TOKEN" \
+  --from-literal=apiToken="$DT_OPERATOR_TOKEN" \
   --from-literal=dataIngestToken="$DT_INGEST_TOKEN" \
   --dry-run=client -o yaml | kubectl apply -f -
 

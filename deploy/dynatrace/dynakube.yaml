@@ -36,9 +36,11 @@ spec:
   apiUrl: ${DT_API_URL}
 
   # Name of the Secret (same namespace) holding `apiToken` and `dataIngestToken`.
-  # Created by install.sh from DT_API_TOKEN / DT_INGEST_TOKEN. By convention the
-  # operator looks for a Secret named after the DynaKube when `tokens` is unset;
-  # we set it explicitly for clarity.
+  # Created by install.sh from DT_OPERATOR_TOKEN / DT_INGEST_TOKEN — both PLATFORM
+  # tokens (dt0s16) on this Gen3 tenant. The key names are unchanged: operator
+  # 1.10.0+ accepts a platform token in these keys (no DynaKube field change
+  # needed vs classic dt0c01 tokens). By convention the operator looks for a
+  # Secret named after the DynaKube when `tokens` is unset; we set it explicitly.
   tokens: ${DYNAKUBE_NAME}
 
   # Give every monitored entity a stable, per-attendee cluster label so the shared
