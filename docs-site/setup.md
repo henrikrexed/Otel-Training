@@ -34,6 +34,24 @@ PARTICIPANT_ID
     neighbor's. (Advanced: `KIND_CLUSTER_NAME` overrides it if you ever need to
     name the cluster directly; most attendees never set it.)
 
+!!! tip "Advanced track only: check `opencode` works"
+    The [advanced self-paced track](advanced/getting-started.md) drives the
+    `opencode` AI coding agent, wired at start-up to a facilitator-hosted LLM
+    proxy. If you are on that track and set the two `WORKSHOP_*` secrets, confirm
+    the agent and its proxy credential are in place:
+
+    ```bash
+    opencode --version                 # the CLI is baked into the image
+    test -f .workshop-llm.env && echo "proxy credential minted" || \
+      echo "no proxy credential — re-run: bash .devcontainer/bootstrap/dispense-llm.sh"
+    opencode run "reply with the word READY"   # should return a model completion
+    ```
+
+    No `.workshop-llm.env`? Post-create setup skipped the dispense because the
+    `WORKSHOP_*` secrets were absent, or the dispenser was unreachable — see
+    [Troubleshooting](troubleshooting.md#workshop-llm-proxy-opencode). The M0–M5
+    modules do **not** need `opencode`, so you can ignore this on the main track.
+
 ## 2. Verify the kind cluster
 
 ```bash

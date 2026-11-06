@@ -10,7 +10,9 @@
       "ARGOCD_VERSION": "${localEnv:ARGOCD_VERSION:v2.13.2}",
       "YQ_VERSION": "${localEnv:YQ_VERSION:v4.44.6}",
       "DTCTL_VERSION": "${localEnv:DTCTL_VERSION:v0.45.0}",
-      "DTCTL_REPO": "${localEnv:DTCTL_REPO:Dynatrace/dtctl}"
+      "DTCTL_REPO": "${localEnv:DTCTL_REPO:Dynatrace/dtctl}",
+      "OPENCODE_VERSION": "${localEnv:OPENCODE_VERSION:v1.19.5}",
+      "OPENCODE_REPO": "${localEnv:OPENCODE_REPO:sst/opencode}"
     }
   },
 
@@ -51,7 +53,13 @@
     "DT_API_TOKEN": "${localEnv:DT_API_TOKEN}",
     "DT_INGEST_TOKEN": "${localEnv:DT_INGEST_TOKEN}",
     "KUBECONFIG": "/home/vscode/.kube/config",
-    "KIND_CLUSTER_NAME": "${localEnv:KIND_CLUSTER_NAME:otel-training}"
+    "KIND_CLUSTER_NAME": "${localEnv:KIND_CLUSTER_NAME:otel-training}",
+    // Workshop LLM proxy (advanced track, Step 1 / opencode). Both injected as
+    // Codespace secrets; absent outside the facilitated workshop, in which case
+    // dispense-llm.sh skips cleanly. WORKSHOP_ROOM_PASSWORD is a secret — never
+    // bake it into the image or commit it.
+    "WORKSHOP_DISPENSER_URL": "${localEnv:WORKSHOP_DISPENSER_URL}",
+    "WORKSHOP_ROOM_PASSWORD": "${localEnv:WORKSHOP_ROOM_PASSWORD}"
   },
 
   "customizations": {

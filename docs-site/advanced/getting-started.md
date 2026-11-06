@@ -27,6 +27,15 @@ they are and how to check them.
 | `DT_API_TOKEN` | API token for Kubernetes monitoring (ActiveGate / operator) | [Access tokens](https://docs.dynatrace.com/docs/manage/access-control/access-tokens) |
 | `GITLAB_REPO_URL` | HTTPS URL of **your** casino fork (see step 2) | — |
 | `GITLAB_TOKEN` | Token scoped to your fork (`read_repository` + `write_repository`) | [GitLab access tokens](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) |
+| `WORKSHOP_DISPENSER_URL` | Endpoint that mints your per-attendee LLM proxy key (for `opencode` in Step 1) | — |
+| `WORKSHOP_ROOM_PASSWORD` | Shared room password sent to the dispenser | — |
+
+!!! note "The two `WORKSHOP_*` secrets are only for Step 1"
+    They wire the `opencode` AI coding agent to a facilitator-hosted LLM proxy.
+    If they are not set, the Codespace still comes up fully — only the Step 1
+    AI-agent instrumentation flow is unavailable (post-create setup says so and
+    moves on). Your per-attendee budget is enforced on the proxy; there is
+    nothing to configure for it locally.
 
 !!! note "You never paste a token into the repo"
     Tokens live only as Codespace secrets and are read at runtime. Nothing is

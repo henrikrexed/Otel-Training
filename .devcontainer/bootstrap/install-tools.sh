@@ -5,7 +5,7 @@
 # missing or when FORCE=1. Versions are read from env vars so the same script is
 # used at image build time (Dockerfile) and for runtime self-heal (postStart).
 #
-# Tools: kubectl, helm, kind, argocd, yq, dtctl  (jq/git come from apt in the image)
+# Tools: kubectl, helm, kind, argocd, yq, dtctl, opencode  (jq/git come from apt)
 set -euo pipefail
 
 # Default pinned to the kind node image (kind-config.yaml); "stable" still works
@@ -17,6 +17,8 @@ ARGOCD_VERSION="${ARGOCD_VERSION:-v2.13.2}"
 YQ_VERSION="${YQ_VERSION:-v4.44.6}"
 DTCTL_VERSION="${DTCTL_VERSION:-v0.45.0}"   # Dynatrace/dtctl GoReleaser tag; "latest" resolves via API
 DTCTL_REPO="${DTCTL_REPO:-Dynatrace/dtctl}"  # was dynatrace-oss/dtctl — repo moved to the Dynatrace org
+OPENCODE_VERSION="${OPENCODE_VERSION:-v1.19.5}"  # sst/opencode release tag; "latest" resolves via API
+OPENCODE_REPO="${OPENCODE_REPO:-sst/opencode}"
 FORCE="${FORCE:-0}"
 
 BIN_DIR="${BIN_DIR:-/usr/local/bin}"
@@ -121,6 +123,55 @@ install_dtctl() {
   log "dtctl installed: $(dtctl version 2>/dev/null || echo 'installed (version check deferred)')"
 }
 
+# opencode — the terminal AI coding agent (github.com/sst/opencode) the advanced
+# instrumentation lab drives. Released as per-OS/arch tarballs:
+# opencode-<os>-<arch>.tar.gz (e.g. opencode-linux-x64.tar.gz), each containing
+# the `opencode` binary. The devcontainer base is glibc Ubuntu, so we use the
+# non-musl build. Arch-aware via the same $OS/$ARCH the other installers use
+# (mapping amd64->x64), and download failures are non-fatal — the rest of the
+# toolchain still installs and the workshop can self-heal with FORCE=1 later.
+install_opencode() {
+  if have opencode && [[ "$FORCE" != "1" ]]; then log "opencode present: $(opencode --version 2>/dev/null || echo unknown)"; return; fi
+  # opencode asset arch names: amd64 -> x64, arm64 -> arm64.
+  local oc_arch
+  case "$ARCH" in
+    amd64) oc_arch="x64" ;;
+    arm64) oc_arch="arm64" ;;
+    *) echo "WARN: no opencode build for arch '$ARCH' — skipping" >&2; return ;;
+  esac
+  local url="${OPENCODE_DOWNLOAD_URL:-}"
+  if [[ -z "$url" ]]; then
+    local tag="$OPENCODE_VERSION"
+    # "latest" embeds the version in the asset path, so resolve the real tag first.
+    if [[ "$tag" == "latest" ]]; then
+      tag="$(curl -fsSL "https://api.github.com/repos/${OPENCODE_REPO}/releases/latest" \
+             | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
+      [[ -z "$tag" ]] && { echo "WARN: could not resolve latest opencode tag from GitHub API" >&2; return; }
+    fi
+    url="https://github.com/${OPENCODE_REPO}/releases/download/${tag}/opencode-${OS}-${oc_arch}.tar.gz"
+  fi
+  log "installing opencode from ${url}"
+  if ! curl -fsSLo /tmp/opencode.tgz "$url"; then
+    echo "WARN: could not download opencode from ${url}." >&2
+    echo "WARN: set OPENCODE_DOWNLOAD_URL (direct .tar.gz) or OPENCODE_VERSION and re-run:" >&2
+    echo "WARN:   FORCE=1 bash .devcontainer/bootstrap/install-tools.sh" >&2
+    rm -f /tmp/opencode.tgz
+    return
+  fi
+  if ! tar tzf /tmp/opencode.tgz >/dev/null 2>&1; then
+    echo "WARN: opencode download is not a gzip tarball — skipping" >&2
+    rm -f /tmp/opencode.tgz
+    return
+  fi
+  local tmpd; tmpd="$(mktemp -d)"
+  tar xzf /tmp/opencode.tgz -C "$tmpd"
+  local bin; bin="$(find "$tmpd" -type f -name opencode | head -n1)"
+  [[ -z "$bin" ]] && { echo "WARN: opencode binary not found inside archive" >&2; rm -rf "$tmpd" /tmp/opencode.tgz; return; }
+  install_bin opencode "$bin"
+  rm -rf "$tmpd" /tmp/opencode.tgz
+  log "opencode installed: $(opencode --version 2>/dev/null || echo 'installed (version check deferred)')"
+}
+
 main() {
   install_kubectl
   install_helm
@@ -128,6 +179,7 @@ main() {
   install_argocd
   install_yq
   install_dtctl
+  install_opencode
   log "toolchain install complete"
 }
 main "$@"
