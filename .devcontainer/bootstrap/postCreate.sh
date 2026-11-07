@@ -33,6 +33,14 @@ bash "$SCRIPT_DIR/verify-dtctl.sh" || {
 log "wiring the workshop LLM proxy (opencode)"
 bash "$SCRIPT_DIR/dispense-llm.sh" || log "WARN: dispense-llm.sh reported an issue; opencode AI steps may be unavailable (non-fatal)."
 
+# Install the Dynatrace dtctl Agent Skill into opencode (ISI-7176). Runs after
+# both dtctl (verify-dtctl.sh above) and opencode (install-tools.sh) are known
+# present. Explicit `--for opencode --global` install to
+# ~/.config/opencode/skills/dtctl/; non-fatal and idempotent, and the skill
+# re-uses the existing DT platform token (dt0s16) — no new secret.
+log "installing the dtctl Agent Skill for opencode"
+bash "$SCRIPT_DIR/install-dtctl-skill.sh" || log "WARN: install-dtctl-skill.sh reported an issue; the dtctl skill may be unavailable in opencode (non-fatal)."
+
 log "standing up kind cluster"
 bash "$SCRIPT_DIR/create-cluster.sh"
 

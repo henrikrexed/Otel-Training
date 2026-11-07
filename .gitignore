@@ -6,5 +6,10 @@
 # workshop LLM proxy credential minted by dispense-llm.sh — holds a live key.
 .workshop-llm.env
 
+# dtctl Agent Skill installed into the repo tree by install-dtctl-skill.sh when
+# the global install path is unavailable (fallback for older dtctl). Generated
+# per-attendee at bootstrap — never commit it.
+.opencode/
+
 # mkdocs build output
 site/

@@ -81,6 +81,43 @@ FORCE=1 bash .devcontainer/bootstrap/install-tools.sh
 > on a tenant- or region-specific dtctl mirror, set `DTCTL_DOWNLOAD_URL` as a
 > Codespaces secret / build arg to bake that exact binary instead.
 
+## dtctl Agent Skill for opencode (ISI-7176)
+
+The advanced track drives Dynatrace from the [opencode](https://opencode.ai)
+terminal agent. During bootstrap, `postCreate.sh` runs
+`bootstrap/install-dtctl-skill.sh`, which **installs the ready-made dtctl Agent
+Skill** that ships embedded in the dtctl CLI (we install it, we don't author it).
+Once installed, opencode auto-loads the skill (name `dtctl`) and can investigate
+problems, run DQL, inspect logs/SLOs, and build dashboards.
+
+**Resolved install path (the open design question):** we target opencode
+**explicitly and globally** rather than relying on auto-detect:
+
+```bash
+dtctl skills install --for opencode --global --force --plain
+# -> ~/.config/opencode/skills/dtctl/   (SKILL.md + references/)
+```
+
+`~/.config/opencode/skills/` is opencode's documented **global** skill-discovery
+directory. We pin `--for opencode` because dtctl's auto-detect keys off the
+`OPENCODE` env var, which is not set in a non-interactive bootstrap shell — so a
+bare `dtctl skills install` would guess the wrong agent. If a dtctl build lacks
+opencode global support (older than v0.45.0), the script falls back to a
+project-scoped install at the repo root (`.opencode/skills/dtctl/`), which
+opencode also loads by walking up to the git worktree root. The install is
+non-interactive (`--force --plain`), idempotent (`FORCE=1` to refresh), and
+non-fatal; the pinned skill version (== the dtctl version) and resolved path are
+recorded to `~/.otel-training-dtctl-skill.txt`.
+
+**Auth — no new secret.** The skill operates Dynatrace through the dtctl CLI,
+which authenticates with the **existing platform token (`dt0s16`)** already
+provisioned via `DT_PLATFORM_TOKEN` / `DT_ENVIRONMENT`. Installing the skill
+needs no credentials (it only copies embedded files). Confirm any time with:
+
+```bash
+dtctl skills status --plain
+```
+
 ## Cold start & pre-warm guidance (day-of)
 
 - First create builds the image (or uses a **Codespaces prebuild**) and then
@@ -101,9 +138,12 @@ FORCE=1 bash .devcontainer/bootstrap/install-tools.sh
 ├── Dockerfile               # ubuntu-24.04 base + baked toolchain
 ├── .env.example             # documented per-attendee secrets/env
 └── bootstrap/
-    ├── install-tools.sh     # idempotent, version-pinnable, arch-aware tool install
-    ├── kind-config.yaml      # single-node kind cluster w/ 80/443 + NodePorts
-    ├── create-cluster.sh    # idempotent cluster create / re-attach
-    ├── postCreate.sh        # once: verify tools, create cluster, record timing
-    └── postStart.sh         # every start: heal/re-attach cluster
+    ├── install-tools.sh        # idempotent, version-pinnable, arch-aware tool install (incl. dtctl + opencode)
+    ├── verify-dtctl.sh         # gate: prove dtctl installed + runnable (ISI-7175)
+    ├── dispense-llm.sh         # mint workshop LLM proxy key + wire opencode (ISI-7138)
+    ├── install-dtctl-skill.sh  # install the dtctl Agent Skill into opencode (ISI-7176)
+    ├── kind-config.yaml        # single-node kind cluster w/ 80/443 + NodePorts
+    ├── create-cluster.sh       # idempotent cluster create / re-attach
+    ├── postCreate.sh           # once: verify tools, wire opencode + skill, create cluster, record timing
+    └── postStart.sh            # every start: heal/re-attach cluster
 ```
