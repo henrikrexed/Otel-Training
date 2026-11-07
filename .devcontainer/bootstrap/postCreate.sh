@@ -16,6 +16,16 @@ log() { echo "==> $*"; }
 log "verifying toolchain (self-heal if needed)"
 bash "$SCRIPT_DIR/install-tools.sh"
 
+# dtctl is the one toolchain binary whose download is non-fatal (region/proxy),
+# so prove it landed right after bootstrap (ISI-7175). Non-fatal here too — a
+# missing dtctl must not block the codespace from opening — but it prints a loud,
+# actionable warning so attendees fix it before the Dynatrace-for-AI skills need
+# it. `make verify` re-asserts the same check as a gating step.
+bash "$SCRIPT_DIR/verify-dtctl.sh" || {
+  echo "WARN: dtctl verify failed — see output above; re-install with:" >&2
+  echo "WARN:   FORCE=1 bash .devcontainer/bootstrap/install-tools.sh" >&2
+}
+
 # Mint the workshop LLM proxy credential and point opencode at it BEFORE the
 # stack comes up, so the advanced instrumentation lab has its AI agent ready.
 # dispense-llm.sh is non-fatal and self-skips when the WORKSHOP_* secrets are

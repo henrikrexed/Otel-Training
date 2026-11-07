@@ -301,6 +301,9 @@ run_verify() { # name, script, [extra env assignments...]
   fi
 }
 
+# dtctl CLI (ISI-7175): cluster-independent, always meaningful. Needed by the
+# Dynatrace-for-AI skills (ISI-7169 B2/B3), so gate it in the M0 banner too.
+run_verify dtctl "$SCRIPT_DIR/verify-dtctl.sh"
 # Observability has an OFFLINE validator (validate.sh) — always meaningful.
 run_verify observability "$REPO_ROOT/observability/validate.sh"
 # Gateway API exposure (ISI-6795): verify.sh self-selects offline/live.
