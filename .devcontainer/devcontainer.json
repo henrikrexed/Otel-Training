@@ -45,21 +45,64 @@
   // postStart re-ensures the cluster is healthy after a codespace stop/resume.
   "postStartCommand": "bash .devcontainer/bootstrap/postStart.sh",
 
-  // Tenant connection is injected per attendee — NEVER baked into the image.
-  // See .devcontainer/.env.example and .devcontainer/README.md for the full list.
-  // In GitHub Codespaces set these as Codespaces/Repository secrets.
+  // Per-attendee secrets. In GitHub Codespaces this block drives the "Recommended
+  // secrets" prompt shown when a Codespace is created, with the descriptions
+  // below. (All Codespaces secrets the repo can access are injected into the
+  // container env automatically — this block controls the *recommendation
+  // prompt*, not the injection.) Names MUST equal the env var names the bootstrap
+  // scripts consume (deploy-environment.sh, deploy/dynatrace/install.sh,
+  // observability/install.sh, dispense-llm.sh). The canonical contract +
+  // descriptions are mirrored in .env.sample and .devcontainer/.env.example.
+  // NEVER bake real tokens into the image.
+  "secrets": {
+    "DT_TENANT": {
+      "description": "Dynatrace tenant base URL, e.g. https://abc12345.live.dynatrace.com (operator apiUrl + OTLP ingest derive from this)."
+    },
+    "DT_OPERATOR_TOKEN": {
+      "description": "Dynatrace PLATFORM token (dt0s16) for the operator. Scopes: fleet-management:activegate.connection-info:read, fleet-management:activegate.tokens:create, fleet-management:container-images:read, fleet-management:oneagent.connection-info:read, fleet-management:oneagents:download, settings:objects:read, settings:objects:write."
+    },
+    "DT_INGEST_TOKEN": {
+      "description": "Dynatrace PLATFORM token (dt0s16) for data ingest (collectors + operator dataIngest). Scopes: openpipeline:traces:ingest, openpipeline:metrics:ingest, openpipeline:logs:ingest, openpipeline:events:ingest, storage:metrics:write."
+    },
+    "DT_PLATFORM_TOKEN": {
+      "description": "Dynatrace PLATFORM token (dt0s16) for dtctl."
+    },
+    "PARTICIPANT_ID": {
+      "description": "Your unique DNS-label-safe id (lowercase alphanumeric + '-'); names your kind cluster, k8s.cluster.name, and DynaKube."
+    },
+    "WORKSHOP_DISPENSER_URL": {
+      "description": "LiteLLM dispenser URL for the opencode LLM proxy (advanced track). Provided by the facilitator."
+    },
+    "WORKSHOP_ROOM_PASSWORD": {
+      "description": "LiteLLM dispenser room password (advanced track). Provided by the facilitator."
+    }
+  },
+
+  // The `secrets` block above is the authoritative per-attendee contract and the
+  // Codespaces prompt source. The entries here deliver those SAME values to a
+  // LOCAL (non-Codespaces) VS Code devcontainer, where the secrets block does
+  // nothing and ${localEnv:...} forwards the host's exported value (empty ->
+  // scripts fall back cleanly). This is NOT a second source of truth: the value
+  // still originates from the Codespaces secret / the user's host env — remoteEnv
+  // only forwards it into the container. KUBECONFIG and KIND_CLUSTER_NAME are
+  // non-secret operational vars.
   "remoteEnv": {
     "DT_TENANT": "${localEnv:DT_TENANT}",
+    "DT_OPERATOR_TOKEN": "${localEnv:DT_OPERATOR_TOKEN}",
+    // DEPRECATED alias: honoured by the scripts as a fallback for a not-yet-renamed
+    // secret. Prefer DT_OPERATOR_TOKEN; kept here so local runs still migrate.
     "DT_API_TOKEN": "${localEnv:DT_API_TOKEN}",
     "DT_INGEST_TOKEN": "${localEnv:DT_INGEST_TOKEN}",
-    "KUBECONFIG": "/home/vscode/.kube/config",
-    "KIND_CLUSTER_NAME": "${localEnv:KIND_CLUSTER_NAME:otel-training}",
-    // Workshop LLM proxy (advanced track, Step 1 / opencode). Both injected as
-    // Codespace secrets; absent outside the facilitated workshop, in which case
-    // dispense-llm.sh skips cleanly. WORKSHOP_ROOM_PASSWORD is a secret — never
-    // bake it into the image or commit it.
+    "DT_PLATFORM_TOKEN": "${localEnv:DT_PLATFORM_TOKEN}",
+    "PARTICIPANT_ID": "${localEnv:PARTICIPANT_ID}",
     "WORKSHOP_DISPENSER_URL": "${localEnv:WORKSHOP_DISPENSER_URL}",
-    "WORKSHOP_ROOM_PASSWORD": "${localEnv:WORKSHOP_ROOM_PASSWORD}"
+    "WORKSHOP_ROOM_PASSWORD": "${localEnv:WORKSHOP_ROOM_PASSWORD}",
+    "KUBECONFIG": "/home/vscode/.kube/config",
+    // Only honoured when the host explicitly sets it; empty otherwise so the
+    // bootstrap scripts derive the cluster name from PARTICIPANT_ID, falling back
+    // to otel-training. A hardcoded default here would shadow PARTICIPANT_ID
+    // (ISI-7050).
+    "KIND_CLUSTER_NAME": "${localEnv:KIND_CLUSTER_NAME}"
   },
 
   "customizations": {
