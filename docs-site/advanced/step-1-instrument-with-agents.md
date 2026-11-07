@@ -49,6 +49,24 @@ opencode --version
 opencode run "reply with the word READY"   # returns a model completion
 ```
 
+### Dynatrace Agent Skills (pre-installed)
+
+The Codespace bootstrap also installs the **Dynatrace-for-AI Agent Skills** so
+`opencode` can reason about Dynatrace data in-context — DQL syntax, observability
+patterns, and Kubernetes/cloud topology (38 `dt-*` skills, pinned to a release).
+No action needed; they are copied into opencode's skills directory during
+start-up. Confirm they loaded:
+
+```bash
+bash .devcontainer/bootstrap/verify-opencode-skills.sh   # gate: dt-dql-essentials, dt-obs-kubernetes, …
+opencode debug skill | grep dt-                          # the raw list opencode sees
+```
+
+If they are missing (e.g. GitHub was unreachable at bootstrap — the install is
+non-fatal), re-run `bash .devcontainer/bootstrap/install-opencode-skills.sh`.
+On a machine with Node you can install the same skill set directly with
+`npx skills add Dynatrace/dynatrace-for-ai`.
+
 Clone your casino fork, `cd` into it, and drive `opencode` at the slots service
 source — either interactively (`opencode`, then type the request) or in one
 shot:

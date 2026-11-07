@@ -41,6 +41,20 @@ bash "$SCRIPT_DIR/dispense-llm.sh" || log "WARN: dispense-llm.sh reported an iss
 log "installing the dtctl Agent Skill for opencode"
 bash "$SCRIPT_DIR/install-dtctl-skill.sh" || log "WARN: install-dtctl-skill.sh reported an issue; the dtctl skill may be unavailable in opencode (non-fatal)."
 
+# Install the Dynatrace-for-AI domain skills for opencode (ISI-7177 B3): DQL
+# syntax, observability patterns, k8s/cloud context (38 dt-* skills). Separate
+# from the dtctl skill above — dtctl ships its own installer, while these are a
+# plain skills repo we fetch and copy (deterministic, node-free, version-pinned;
+# see install-opencode-skills.sh). Both land in ~/.config/opencode/skills. Non-
+# fatal so a network/region hiccup never blocks the codespace; verify-opencode-
+# skills.sh is the loud gate right after, mirroring the dtctl verify above.
+log "installing Dynatrace-for-AI opencode skills"
+bash "$SCRIPT_DIR/install-opencode-skills.sh" || true
+bash "$SCRIPT_DIR/verify-opencode-skills.sh" || {
+  echo "WARN: opencode skills verify failed — see output above; re-install with:" >&2
+  echo "WARN:   bash .devcontainer/bootstrap/install-opencode-skills.sh" >&2
+}
+
 log "standing up kind cluster"
 bash "$SCRIPT_DIR/create-cluster.sh"
 
@@ -58,6 +72,7 @@ cat <<EOF
  - kind cluster:  ${KIND_CLUSTER_NAME:-${PARTICIPANT_ID:-otel-training}}
  - cold start:    ${ELAPSED}s  (saved to $TIMING_FILE)
  Verify with:     kubectl get nodes   &&   dtctl version   &&   opencode --version
+ opencode skills: bash .devcontainer/bootstrap/verify-opencode-skills.sh
  Next tickets build the casino app, observability stack, and
  Dynatrace operator on top of this base.
 ================================================================
