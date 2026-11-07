@@ -33,11 +33,9 @@ environment="$DYNATRACE_ENVIRONMENT"
 if [ "$environment" == "live" ]; then
   export DYNATRACE_LIVE_URL="$DYNATRACE_ENVIRONMENT_ID.live.dynatrace.com"
   export DYNATRACE_APPS_URL="$DYNATRACE_ENVIRONMENT_ID.apps.dynatrace.com"
-  export DYNATRACE_SSO_URL="sso.dynatrace.com/sso/oauth2/token"
 else
   export DYNATRACE_LIVE_URL="$DYNATRACE_ENVIRONMENT_ID.$environment.dynatracelabs.com"
   export DYNATRACE_APPS_URL="$DYNATRACE_ENVIRONMENT_ID.$environment.apps.dynatracelabs.com"
-  export DYNATRACE_SSO_URL="sso-$environment.dynatracelabs.com/sso/oauth2/token"
 fi
 
 # Prepare environment for Terraform
@@ -54,30 +52,6 @@ if echo "$SANITIZED_CODESPACE" | grep -qE '^[0-9]'; then
     SANITIZED_CODESPACE="codespace-${SANITIZED_CODESPACE}"
 fi
 export TF_VAR_codespace_name="$SANITIZED_CODESPACE"
-
-
-
-# Derive the OAuth client id from the client secret so the attendee only has to
-# provide one value. A Dynatrace OAuth client secret has the form
-# `dt0s02.<id>.<secret>`; the client id is the first two dot-segments `dt0s02.<id>`.
-if [ -z "$DYNATRACE_OAUTH_CLIENT_SECRET" ]; then
-    echo "❌ Error: DYNATRACE_OAUTH_CLIENT_SECRET is not set!"
-    echo "   This is required and the OAuth client id is derived from it."
-    echo "   Configure the DYNATRACE_OAUTH_CLIENT_SECRET secret (form dt0s02.<id>.<secret>)."
-    exit 1
-fi
-if ! printf '%s' "$DYNATRACE_OAUTH_CLIENT_SECRET" | grep -qE '^dt0s02\.[^.]+\.[^.]+'; then
-    echo "❌ Error: DYNATRACE_OAUTH_CLIENT_SECRET is malformed!"
-    echo "   Expected the Dynatrace OAuth client secret form: dt0s02.<id>.<secret>"
-    echo "   The client id cannot be derived from the value provided."
-    exit 1
-fi
-DYNATRACE_OAUTH_CLIENT_ID="$(printf '%s' "$DYNATRACE_OAUTH_CLIENT_SECRET" | cut -d. -f1,2)"
-export DYNATRACE_OAUTH_CLIENT_ID
-echo "✅ Derived DYNATRACE_OAUTH_CLIENT_ID from secret: $DYNATRACE_OAUTH_CLIENT_ID"
-
-export DYNATRACE_AUTOMATION_CLIENT_ID=$DYNATRACE_OAUTH_CLIENT_ID
-export DYNATRACE_AUTOMATION_CLIENT_SECRET=$DYNATRACE_OAUTH_CLIENT_SECRET
 
 export DYNATRACE_DEBUG=true
 export DYNATRACE_LOG_HTTP=terraform-provider-dynatrace.http.log
@@ -167,26 +141,6 @@ sed -i "s|DYNATRACE_LIVE_URL|$DYNATRACE_LIVE_URL|g" "$K8S_DIR/dynakube.yaml"
 sed -i "s|CLUSTER_NAME|$CLUSTER_NAME|g" "$K8S_DIR/dynakube.yaml"
 
 kubectl apply --filename "$K8S_DIR/dynakube.yaml"
-
-###############################
-### Kubernetes Edge Connect ###
-###############################
-
-kubectl --namespace dynatrace \
-  create secret generic "edge-connect-${CODESPACE_NAME:0:40}-credentials" \
-  --from-literal=oauth-client-id="$DYNATRACE_OAUTH_CLIENT_ID" \
-  --from-literal=oauth-client-secret="$DYNATRACE_OAUTH_CLIENT_SECRET"
-
-sed -i "s|CODESPACE_NAME|${CODESPACE_NAME:0:40}|g" "$K8S_DIR/edge-connect.yaml"
-sed -i "s|DYNATRACE_ENVIRONMENT_ID|$DYNATRACE_ENVIRONMENT_ID|g" "$K8S_DIR/edge-connect.yaml"
-sed -i "s|DYNATRACE_APPS_URL|$DYNATRACE_APPS_URL|g" "$K8S_DIR/edge-connect.yaml"
-sed -i "s|DYNATRACE_SSO_URL|$DYNATRACE_SSO_URL|g" "$K8S_DIR/edge-connect.yaml"
-sed -i "s|DYNATRACE_ACCOUNT_ID|$DYNATRACE_ACCOUNT_ID|g" "$K8S_DIR/edge-connect.yaml"
-
-kubectl apply --filename "$K8S_DIR/edge-connect.yaml"
-
-# Sleep a bit to allow the Edge Connect to start
-sleep 60
 
 ######################
 ### Infrastructure ###

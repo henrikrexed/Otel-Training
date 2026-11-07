@@ -205,11 +205,12 @@ cd codespace
   --dtid "abc12345" \
   --environment "live" \
   --dtoperatortoken "dt0c01.******" \
-  --dtingesttoken "dt0c01.******" \
-  --oauthclientid "dt0s10.******" \
-  --oauthclientsecret "******" \
-  --oauthclienturn "urn:dtenvironment:abc12345"
+  --dtingesttoken "dt0c01.******"
 ```
+
+!!! note "Dynatrace OAuth is optional"
+    The Dynatrace OAuth client (`dt0s02`) is **not** part of the required secret set for this deployment. It is only
+    needed for the advanced Davis CoPilot features; omit it for a standard observability bring-up.
 
 The script will:
 1. Install required operators (OpenFeature, Dynatrace, OpenTelemetry)

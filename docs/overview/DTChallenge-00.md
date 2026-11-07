@@ -40,7 +40,7 @@ Later on the same workflow will be triggered when you make code changes which en
 
 ### 4: Launch Codespace
 
-Launch the Codespace from your forked repository and provide all the necessary values for the options. You can find all the values in the Launch Pad on our Dynatrace Hackathon Tenant. For reference - these are all the environment variables you need: DYNATRACE_ENVIRONMENT_ID, DYNATRACE_ENVIRONMENT, DYNATRACE_API_TOKEN, DYNATRACE_PLATFORM_TOKEN, DYNATRACE_OAUTH_CLIENT_SECRET, DYNATRACE_ACCOUNT_ID. (The OAuth client id is derived automatically from `DYNATRACE_OAUTH_CLIENT_SECRET`, so it is not requested separately.)
+Launch the Codespace from your forked repository and provide all the necessary values for the options. You can find all the values in the Launch Pad on our Dynatrace Hackathon Tenant. For reference - these are the environment variables you need: DYNATRACE_ENVIRONMENT_ID, DYNATRACE_ENVIRONMENT, DYNATRACE_API_TOKEN, DYNATRACE_PLATFORM_TOKEN, DYNATRACE_ACCOUNT_ID. `DYNATRACE_OAUTH_CLIENT_SECRET` is **optional** — provide it only if you want the advanced Davis CoPilot features (when supplied, the OAuth client id is derived automatically from it, so it is not requested separately).
 
 Wait until the Codespace is fully launched.
 If there are any errors please let us know!

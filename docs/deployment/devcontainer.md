@@ -253,7 +253,7 @@ The Codespace requires these secrets (configured in GitHub Codespace settings):
 | `DYNATRACE_ENVIRONMENT` | Environment type | `live`, `sprint`, or `dev` |
 | `DYNATRACE_API_TOKEN` | API token with `apiTokens.read` & `apiTokens.write` | `dt0c01.xxx` |
 | `DYNATRACE_PLATFORM_TOKEN` | Platform token with `davis-copilot:conversations:execute` (granted via an IAM policy + group assignment — see getting-started) | `dt0c01.xxx` |
-| `DYNATRACE_OAUTH_CLIENT_SECRET` | OAuth client secret (`dt0s02.<id>.<secret>`); the client id is derived from it | `dt0s02.xxx.yyy` |
+| `DYNATRACE_OAUTH_CLIENT_SECRET` | *(optional — advanced)* OAuth client secret (`dt0s02.<id>.<secret>`) for the advanced Davis CoPilot features only; not required for bring-up. When set, the client id is derived from it | `dt0s02.xxx.yyy` |
 | `DYNATRACE_ACCOUNT_ID` | Dynatrace account ID | `xxx` |
 
 ## Accessing the Application
