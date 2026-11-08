@@ -30,21 +30,27 @@
 
 	// Add recommended secrets
 	"secrets": {
-		"DYNATRACE_ENVIRONMENT_ID": {
-			"description": "eg. abc12345 from https://abc12345.apps.dynatrace.com"
+		"DT_TENANT": {
+			"description": "Dynatrace tenant base URL, e.g. https://abc12345.live.dynatrace.com."
 		},
-		"DYNATRACE_ENVIRONMENT": {
-			"description": "Either `live`, `sprint` or `dev`. If unsure, use `live`"
+		"DT_OPERATOR_TOKEN": {
+			"description": "Dynatrace PLATFORM token (dt0s16), operator scopes: fleet-management:{activegate.connection-info:read, activegate.tokens:create, container-images:read, oneagent.connection-info:read, oneagents:download}, settings:objects:{read,write}."
 		},
-		"DYNATRACE_API_TOKEN": {
-			"description": "Dynatrace access token with these permissions: `apiTokens.read` & `apiTokens.write`"
-		  },
-		  "DYNATRACE_PLATFORM_TOKEN": {
-			"description": "Dynatrace platform token with permission `davis-copilot:conversations:execute`. This permission must be granted via IAM: create (or reuse) a policy containing the statement `ALLOW davis-copilot:conversations:execute;`, bind it to a group, and assign your user to that group (see docs/getting-started.md for the step-by-step)."
-		  },
-		  "DYNATRACE_ACCOUNT_ID": {
-			"description": "Dynatrace account id"
-		  }
+		"DT_INGEST_TOKEN": {
+			"description": "Dynatrace PLATFORM token (dt0s16), data ingest: openpipeline:{traces,metrics,logs,events}:ingest + storage:metrics:write."
+		},
+		"DT_PLATFORM_TOKEN": {
+			"description": "Dynatrace PLATFORM token (dt0s16) for dtctl."
+		},
+		"PARTICIPANT_ID": {
+			"description": "Your unique DNS-label-safe id; names kind cluster, k8s.cluster.name, DynaKube."
+		},
+		"WORKSHOP_DISPENSER_URL": {
+			"description": "LiteLLM dispenser URL (advanced track / opencode) — from facilitator."
+		},
+		"WORKSHOP_ROOM_PASSWORD": {
+			"description": "LiteLLM dispenser room password (advanced track) — from facilitator."
+		}
 	},
 
 	// Add Kubernetes VSCode extensions
