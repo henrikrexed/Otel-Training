@@ -31,12 +31,17 @@
   },
 
   // One kind cluster per attendee. The control-plane node publishes 80/443 and a
-  // NodePort range to the codespace so Gateway API / ingress work (ISI-6795).
-  "forwardPorts": [80, 443, 8080, 30000, 30001, 30002],
+  // NodePort band (30000-30002) to the codespace so Gateway API / ingress work
+  // (ISI-6795) and the three attendee UIs are reachable from the Ports panel
+  // (ISI-7533). Each UI's NodePort is labelled below so attendees know what to
+  // click; the bare 80/443 ingress ports stay for the Gateway data plane.
+  "forwardPorts": [80, 443, 30000, 30001, 30002],
   "portsAttributes": {
-    "80": { "label": "cluster-http" },
-    "443": { "label": "cluster-https" },
-    "8080": { "label": "app/argocd" }
+    "80": { "label": "cluster-http", "onAutoForward": "silent" },
+    "443": { "label": "cluster-https", "onAutoForward": "silent" },
+    "30000": { "label": "Casino app", "onAutoForward": "notify" },
+    "30001": { "label": "Git host (Gitea/GitLab UI)", "onAutoForward": "notify" },
+    "30002": { "label": "Argo CD UI", "onAutoForward": "notify" }
   },
 
   // Bootstrap runs once at create time (installs nothing extra — tools are baked
