@@ -45,7 +45,20 @@ log "setting argocd-server to insecure mode (training convenience)"
 $KUBECTL -n "$ARGOCD_NAMESPACE" patch configmap argocd-cmd-params-cm \
   --type merge -p '{"data":{"server.insecure":"true"}}'
 $KUBECTL -n "$ARGOCD_NAMESPACE" rollout restart deploy/argocd-server
-$KUBECTL -n "$ARGOCD_NAMESPACE" rollout status deploy/argocd-server --timeout=120s
+# BEST-EFFORT wait (|| true). Exposing the UI is a convenience, NOT a hard
+# prerequisite for the GitOps path: the application-controller + repo-server are
+# what sync the casino, and they are already Ready above. On a loaded 8 GB
+# codespace (obs + Dynatrace + NGF + Gitea + Argo all at once) argocd-server can
+# take >120s to re-roll after the restart. If this wait were fatal (it was —
+# ISI-7551), `set -e` would abort install-argocd.sh, and because
+# bootstrap-gitops.sh calls this BEFORE creating the casino Application, the
+# casino app would never be created (casino :30000 dead) while the UI sat
+# half-restarted (:30002 unreachable) — exactly the live failure. Keep it
+# non-fatal and longer; gitops/verify.sh authoritatively asserts the end state
+# (NodePort 30002 + insecure=true + Ready) and fails the M0 banner loudly if the
+# UI really did not come up.
+$KUBECTL -n "$ARGOCD_NAMESPACE" rollout status deploy/argocd-server --timeout=300s || \
+  echo "==> WARN: argocd-server not Ready within 300s after restart; the casino app will still be created and the UI should settle shortly (verify.sh will confirm :30002)"
 
 cat <<EOF
 

@@ -81,6 +81,42 @@ fi
 kubectl -n "$GITEA_NS" get deploy gitea >/dev/null 2>&1 \
   && pass "gitea deployment present" || fail "gitea deployment missing"
 
+# --- 0.5 Argo CD UI reachable on NodePort 30002 (ISI-7551) ------------------
+# The "Argo CD UI does not load" failure (ISI-7545/7551) is NOT covered by the
+# sync/health checks below: the application-controller can sync the casino while
+# argocd-server is still serving HTTPS on a mis-patched Service, so the UI 404s/
+# TLS-errors at http://localhost:30002. Assert the three things install-argocd.sh
+# sets, so a half-exposed UI fails the M0 banner loudly instead of silently
+# regressing.
+hdr "0.5 Argo CD UI exposed on NodePort 30002 (insecure http)"
+ARGO_UI_NODEPORT="${ARGO_UI_NODEPORT:-30002}"
+svc_type=$(kubectl -n "$ARGOCD_NS" get svc argocd-server -o jsonpath='{.spec.type}' 2>/dev/null)
+[[ "$svc_type" == "NodePort" ]] \
+  && pass "argocd-server Service type is NodePort" \
+  || fail "argocd-server Service type is '${svc_type:-none}' (expected NodePort)"
+# The http port must map 80 -> targetPort 8080 on nodePort 30002, and there must
+# be no stray https port left squatting on another forwarded NodePort (30000).
+ui_np=$(kubectl -n "$ARGOCD_NS" get svc argocd-server \
+  -o jsonpath="{.spec.ports[?(@.nodePort==$ARGO_UI_NODEPORT)].targetPort}" 2>/dev/null)
+[[ "$ui_np" == "8080" ]] \
+  && pass "argocd-server exposes http on NodePort $ARGO_UI_NODEPORT -> targetPort 8080" \
+  || fail "no http NodePort $ARGO_UI_NODEPORT -> 8080 on argocd-server (got targetPort '${ui_np:-none}')"
+stray_https=$(kubectl -n "$ARGOCD_NS" get svc argocd-server \
+  -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}' 2>/dev/null)
+[[ -z "$stray_https" ]] \
+  && pass "no stray https NodePort on argocd-server (http-only, ISI-7533 band kept clean)" \
+  || fail "argocd-server still exposes an https NodePort ($stray_https) — collides with the casino band"
+insecure=$(kubectl -n "$ARGOCD_NS" get cm argocd-cmd-params-cm \
+  -o jsonpath='{.data.server\.insecure}' 2>/dev/null)
+[[ "$insecure" == "true" ]] \
+  && pass "argocd-cmd-params-cm server.insecure=true (UI serves plain http)" \
+  || fail "server.insecure is '${insecure:-unset}' (expected true) — http://localhost:$ARGO_UI_NODEPORT will TLS-fail"
+if kubectl -n "$ARGOCD_NS" rollout status deploy/argocd-server --timeout=5s >/dev/null 2>&1; then
+  pass "argocd-server Deployment is Ready (UI backend up)"
+else
+  fail "argocd-server not Ready — UI at :$ARGO_UI_NODEPORT will not load"
+fi
+
 # --- 1. AC: Application healthy + synced against the hosted repo ------------
 hdr "1. Argo CD Application Synced + Healthy (AC #1)"
 refresh_app
