@@ -155,6 +155,25 @@ deploy/dynatrace/
 └── uninstall.sh          # ordered teardown
 ```
 
+## Troubleshooting
+
+- **`<name>-activegate-0` stuck in `Init:ImagePullBackOff`** (ISI-7553). The
+  ActiveGate pod (both its init and main container use the same AG image) cannot
+  pull from the **per-tenant** registry (`<env>.live.dynatrace.com/linux/...`).
+  Root cause: that registry authenticates only **classic** API tokens (`dt0c01`),
+  but this training uses **platform** tokens (`dt0s16`, since ISI-7163/ISI-7167),
+  so the operator-synthesised pull-secret can't authenticate the pull.
+  **Fix (already in `dynakube.yaml`):** the annotation
+  `feature.dynatrace.com/use-public-registry: "true"` makes the operator pull the
+  AG image from Dynatrace's **public** registry
+  (`public.ecr.aws/dynatrace/dynatrace-activegate`) instead — no pull-secret
+  required, and multi-arch (amd64 + arm64), which also removes the Apple-Silicon
+  arch-tag risk. `public.ecr.aws` egress is already proven in the codespace (the
+  operator chart ships from `oci://public.ecr.aws/dynatrace/dynatrace-operator`).
+  To confirm the registry actually in use on a live pod:
+  `kubectl -n dynatrace get pod <name>-activegate-0 -o jsonpath='{.spec.initContainers[*].image}{"\n"}{.spec.containers[*].image}{"\n"}'`
+  — expect `public.ecr.aws/...`, not `<env>.live.dynatrace.com/...`.
+
 ## Notes / follow-ups
 
 - **API version pin:** `dynakube.yaml` uses `dynatrace.com/v1beta6`, the DynaKube
