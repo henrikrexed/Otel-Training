@@ -13,7 +13,7 @@ and you can play the casino. Budget 15 minutes; helpers circulate.
 Your Codespace secrets were injected by the organizers. Check they are present:
 
 ```bash
-env | grep -E 'DT_TENANT|DT_API_TOKEN|DT_INGEST_TOKEN|KIND_CLUSTER_NAME' | cut -d= -f1
+env | grep -E 'DT_TENANT|DT_API_TOKEN|DT_INGEST_TOKEN|PARTICIPANT_ID' | cut -d= -f1
 ```
 
 Expected output: the four variable **names** (values stay hidden in lists):
@@ -22,14 +22,17 @@ Expected output: the four variable **names** (values stay hidden in lists):
 DT_TENANT
 DT_API_TOKEN
 DT_INGEST_TOKEN
-KIND_CLUSTER_NAME
+PARTICIPANT_ID
 ```
 
-!!! note "Your cluster name is your identity"
-    Everyone shares one Dynatrace tenant. `KIND_CLUSTER_NAME` is unique per
-    attendee and becomes `k8s.cluster.name` on every piece of telemetry you
-    send. **Always filter Dynatrace by your cluster name** — that is how you
-    see your casino and not your neighbor's.
+!!! note "Your `PARTICIPANT_ID` is your identity"
+    Everyone shares one Dynatrace tenant. `PARTICIPANT_ID` is the one value you
+    set to be unique: it names your kind cluster and becomes `k8s.cluster.name`
+    on every piece of telemetry you send. Keep it DNS-label-safe (lowercase
+    letters, digits, `-` — no spaces or uppercase). **Always filter Dynatrace by
+    your cluster name** — that is how you see your casino and not your
+    neighbor's. (Advanced: `KIND_CLUSTER_NAME` overrides it if you ever need to
+    name the cluster directly; most attendees never set it.)
 
 ## 2. Verify the kind cluster
 
@@ -37,7 +40,7 @@ KIND_CLUSTER_NAME
 kubectl get nodes
 ```
 
-Expected: one node named `<KIND_CLUSTER_NAME>-control-plane`, status `Ready`.
+Expected: one node named `<PARTICIPANT_ID>-control-plane`, status `Ready`.
 
 ```bash
 kubectl get pods -A
@@ -70,14 +73,14 @@ bash gitops/bootstrap/bootstrap-gitops.sh
 
 2. Sign in with the credentials from your handout.
 3. Go to **Infrastructure → Kubernetes** and confirm a cluster named after your
-   `KIND_CLUSTER_NAME` appears (first appearance can take a few minutes).
+   `PARTICIPANT_ID` appears (first appearance can take a few minutes).
 4. Open **Distributed traces**. You should see a trickle of traces from the
    casino already — the k6 load generator is playing the casino for you. The
    traces will look *broken*. That is intentional; it is Module 1's job.
 
 !!! tip "Filter by your cluster"
     In most Dynatrace views you can add a filter `k8s.cluster.name` =
-    your `KIND_CLUSTER_NAME`. Set it once, save the view — you will use it all
+    your `PARTICIPANT_ID`. Set it once, save the view — you will use it all
     day.
 
 ## 4. Open the GitOps loop
@@ -86,10 +89,19 @@ Your lab mechanic for the whole session: **edit a manifest → commit → Argo C
 deploys it**. No `kubectl apply` into the `casino` namespace (Argo CD's
 self-heal would revert it anyway).
 
+All three UIs are forwarded to your codespace and appear, labelled, in the
+**Ports** panel (`Casino app` → 30000, `Git host` → 30001, `Argo CD UI` → 30002):
+
 | Endpoint | URL | Credentials |
 |---|---|---|
+| Casino app | http://localhost:30000 | register a player in the UI |
 | Gitea (your Git host) | http://localhost:30001 | `attendee` / `trainingpass123` |
 | Argo CD | http://localhost:30002 | `admin` / password printed at bootstrap |
+
+> **Using an external GitLab fork?** When your environment sets
+> `GITOPS_PROVIDER=gitlab`, the git host is **not** the in-cluster Gitea on
+> 30001 — open your GitLab fork's web URL instead (printed in the GitOps
+> bootstrap banner). Ports 30000 (casino) and 30002 (Argo CD) are unchanged.
 
 1. Open Gitea at http://localhost:30001 and sign in.
 2. Find the repo `casino/casino` — it contains the Kubernetes manifests for
@@ -99,19 +111,17 @@ self-heal would revert it anyway).
 
 ## 5. Play the casino
 
-The casino UI is the frontend service (`vegas-casino-frontend`, port 3000).
-Bring it up on your laptop through a port-forward:
+The casino UI is the frontend service (`vegas-casino-frontend`), exposed through
+the Gateway API data plane on **NodePort 30000**. In the Codespaces **Ports**
+panel it shows up labelled **Casino app** — click the globe icon on port
+**30000** (or open **http://localhost:30000** in VS Code / local Dev Containers).
 
-```bash
-kubectl -n casino port-forward deploy/vegas-casino-frontend 3000:3000
-```
+Register a player account, and play a few rounds — try the slots and another
+game. Any game works; the point is generating telemetry.
 
-Open http://localhost:3000, register a player account, and play a few rounds —
-try the slots and another game. Any game works; the point is generating
-telemetry.
-
-Keep the port-forward terminal open and use a **second terminal** (+ icon)
-for everything else.
+> No `kubectl port-forward` needed: 30000 is published by the kind control-plane
+> node and forwarded to the codespace, the same way the Gitea (30001) and Argo CD
+> (30002) UIs are.
 
 Sanity-check the entry point from inside the cluster:
 
@@ -141,7 +151,7 @@ the gateway log.
 - [ ] All pods Running in `casino`, `observability`, `dynatrace`, `gitea`, `argocd`
 - [ ] Your cluster appears under **Infrastructure → Kubernetes** in Dynatrace
 - [ ] Gitea reachable at http://localhost:30001, repo `casino/casino` visible
-- [ ] Casino UI reachable at http://localhost:3000 and you played a round
+- [ ] Casino UI reachable at http://localhost:30000 and you played a round
 - [ ] `otel-gateway` log shows no export errors
 
 Stuck? Check the [Troubleshooting](troubleshooting.md) page, or flag a helper.
