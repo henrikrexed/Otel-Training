@@ -51,7 +51,20 @@ case "$GITOPS_PROVIDER" in
     $KUBECTL apply -f "$GITOPS_DIR/install/gitea.yaml"
 
     log "2/4 seeding Gitea (account + casino repo + manifests)"
-    bash "$GITOPS_DIR/install/seed-gitea.sh"
+    # Non-fatal + loud (ISI-7555). On a loaded 8 GB codespace Gitea can be slow to
+    # roll; previously a seed hiccup (set -e + a readiness-wait timeout inside
+    # seed-gitea.sh) aborted THIS script before steps 3/4 + 4/4, so Argo CD never
+    # installed (no `argocd` namespace) and the casino Application was never
+    # created. Argo CD + the casino Application do NOT need Gitea seeded at install
+    # time — Argo CD retries the sync once the repo is reachable — so decouple:
+    # let the chain continue even if the seed is slow/incomplete. seed-gitea.sh is
+    # idempotent, so a postStart re-run finishes it; the casino-health loop below
+    # asserts the true end state and fails loudly if the casino never syncs.
+    if ! bash "$GITOPS_DIR/install/seed-gitea.sh"; then
+      echo "" >&2
+      echo "WARN: seed-gitea.sh did not complete cleanly — continuing so Argo CD still installs." >&2
+      echo "      Re-run deploy (idempotent) once Gitea is Ready to finish seeding the casino repo." >&2
+    fi
 
     log "3/4 installing Argo CD"
     bash "$GITOPS_DIR/install/install-argocd.sh"

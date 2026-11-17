@@ -21,26 +21,59 @@ CASINO_REPO="${CASINO_REPO:-casino}"
 CASINO_MANIFESTS_DIR="${CASINO_MANIFESTS_DIR:-$REPO_ROOT/deploy/casino/k8s}"
 KUBECTL="${KUBECTL:-kubectl}"
 
-log() { echo "==> $*"; }
+log()  { echo "==> $*"; }
+warn() { echo "==> WARN: $*" >&2; }
 api() { curl -fsS -u "${GITEA_ADMIN_USER}:${GITEA_ADMIN_PASS}" -H "Content-Type: application/json" "$@"; }
 
-log "waiting for Gitea to be ready"
-$KUBECTL -n "$GITEA_NS" rollout status deploy/gitea --timeout=180s
+# Readiness wait is best-effort + loud (ISI-7555). On a loaded 8 GB codespace
+# (obs + Dynatrace + NGF + Gitea all rolling at once) Gitea can miss a short
+# window. A fatal timeout here used to abort the whole GitOps bring-up — seed is
+# called under `set -e` from bootstrap-gitops.sh — BEFORE Argo CD installed, so
+# there was no `argocd` namespace and no casino. Wait longer and never let the
+# wait itself kill the run; the API/push steps below retry, and
+# bootstrap-gitops.sh now treats a non-zero seed as non-fatal so Argo CD still
+# installs and syncs once the repo lands.
+log "waiting for Gitea to be ready (best-effort; up to 300s)"
+$KUBECTL -n "$GITEA_NS" rollout status deploy/gitea --timeout=300s \
+  || warn "Gitea deploy not Ready within 300s — continuing; API/push steps retry below"
 
 # 1) Admin user — created inside the pod (SQLite), idempotent.
 log "ensuring Gitea admin user '$GITEA_ADMIN_USER'"
-POD="$($KUBECTL -n "$GITEA_NS" get pod -l app.kubernetes.io/name=gitea -o jsonpath='{.items[0].metadata.name}')"
-$KUBECTL -n "$GITEA_NS" exec "$POD" -- sh -c \
-  "gitea admin user create --username '$GITEA_ADMIN_USER' --password '$GITEA_ADMIN_PASS' \
-     --email '$GITEA_ADMIN_EMAIL' --admin --must-change-password=false 2>/dev/null \
-   || echo 'user already exists'"
-
-# 2) Wait for the HTTP API to answer through the forwarded NodePort.
-log "waiting for Gitea HTTP API at $GITEA_URL"
+# Wait for a running Gitea pod before exec'ing — under a slow roll the pod name
+# may not exist yet (empty -> exec fails under set -e). Patient + non-fatal
+# (ISI-7555); the HTTP API wait below is the real gate.
+POD=""
 for i in $(seq 1 30); do
-  if curl -fsS "$GITEA_URL/api/healthz" >/dev/null 2>&1; then break; fi
+  POD="$($KUBECTL -n "$GITEA_NS" get pod -l app.kubernetes.io/name=gitea \
+           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  [[ -n "$POD" ]] && break
   sleep 2
 done
+if [[ -n "$POD" ]]; then
+  $KUBECTL -n "$GITEA_NS" exec "$POD" -- sh -c \
+    "gitea admin user create --username '$GITEA_ADMIN_USER' --password '$GITEA_ADMIN_PASS' \
+       --email '$GITEA_ADMIN_EMAIL' --admin --must-change-password=false 2>/dev/null \
+     || echo 'user already exists'" \
+    || warn "admin user create exec failed — the HTTP API wait below still gates the seed"
+else
+  warn "no Gitea pod found after ~60s — skipping in-pod admin create; the HTTP API wait below will gate the seed"
+fi
+
+# 2) Wait for the HTTP API to answer through the forwarded NodePort. Loud on
+# timeout instead of silently falling through to blind API calls (ISI-7555): if
+# the API never answers, bail non-zero so bootstrap-gitops.sh records the seed
+# as incomplete and moves on to install Argo CD — a re-run finishes the seed.
+log "waiting for Gitea HTTP API at $GITEA_URL (up to 120s)"
+API_UP=0
+for i in $(seq 1 60); do
+  if curl -fsS "$GITEA_URL/api/healthz" >/dev/null 2>&1; then API_UP=1; break; fi
+  sleep 2
+done
+if [[ "$API_UP" -ne 1 ]]; then
+  warn "Gitea HTTP API did not answer at $GITEA_URL within 120s — skipping repo seed this pass."
+  warn "Argo CD still installs; re-run deploy (idempotent) once Gitea is up to seed the casino repo."
+  exit 1
+fi
 
 # 3) Organisation + repo (ignore 'already exists').
 log "ensuring org '$CASINO_ORG' and repo '$CASINO_REPO'"
@@ -67,7 +100,14 @@ cp -r "$CASINO_MANIFESTS_DIR"/. "$WORK/k8s/"
   git config user.name "$GITEA_ADMIN_USER"
   git add .
   git commit -q -m "Seed casino manifests (source of truth: ISI-6794)"
-  git push -q -f "$PUSH_URL" main
+  # Retry the push — on a slow codespace the org/repo create above may still be
+  # settling the first time around (ISI-7555). Idempotent (force-push to main).
+  pushed=0
+  for i in $(seq 1 5); do
+    if git push -q -f "$PUSH_URL" main; then pushed=1; break; fi
+    sleep 3
+  done
+  [[ "$pushed" -eq 1 ]] || { echo "ERROR: failed to push casino manifests to Gitea after 5 tries" >&2; exit 1; }
 )
 
 cat <<EOF
