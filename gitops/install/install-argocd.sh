@@ -28,10 +28,16 @@ $KUBECTL -n "$ARGOCD_NAMESPACE" rollout status statefulset/argocd-application-co
 # Expose the Argo CD UI to the attendee on NodePort 30002 (published by the kind
 # control-plane node). Keeps the UI reachable from the codespace without an
 # extra `kubectl port-forward` running in the background.
-log "exposing Argo CD UI on NodePort 30002"
+#
+# Argo CD owns 30002 ONLY. We deliberately drop argocd-server's https (443)
+# listener here: with `server.insecure=true` (set below) the UI is served over
+# plain HTTP, and mapping https to a NodePort previously collided with 30000 —
+# the casino app's NodePort (CASINO_HTTP_NODEPORT in deploy/gateway/versions.env).
+# A single http port on 30002 keeps the band conflict-free (ISI-7533).
+log "exposing Argo CD UI on NodePort 30002 (http only; 30000 belongs to the casino app)"
 $KUBECTL -n "$ARGOCD_NAMESPACE" patch svc argocd-server \
   --type merge \
-  -p '{"spec":{"type":"NodePort","ports":[{"name":"http","port":80,"targetPort":8080,"nodePort":30002},{"name":"https","port":443,"targetPort":8080,"nodePort":30000}]}}'
+  -p '{"spec":{"type":"NodePort","ports":[{"name":"http","port":80,"targetPort":8080,"nodePort":30002}]}}'
 
 # Run the API server with --insecure so plain HTTP works through the forwarded
 # NodePort in the devcontainer (no cert juggling for a throwaway training env).

@@ -154,10 +154,19 @@ Your lab mechanic for the whole session: **edit a manifest → commit → Argo C
 deploys it**. No `kubectl apply` into the `casino` namespace (Argo CD's
 self-heal would revert it anyway).
 
+All three UIs are forwarded to your codespace and appear, labelled, in the
+**Ports** panel (`Casino app` → 30000, `Git host` → 30001, `Argo CD UI` → 30002):
+
 | Endpoint | URL | Credentials |
 |---|---|---|
+| Casino app | http://localhost:30000 | register a player in the UI |
 | Gitea (your Git host) | http://localhost:30001 | `attendee` / `trainingpass123` |
 | Argo CD | http://localhost:30002 | `admin` / password printed at bootstrap |
+
+> **Using the external GitLab fork?** When the GitOps bootstrap runs with
+> `GITOPS_PROVIDER=gitlab`, the git host is **not** the in-cluster Gitea on
+> 30001 — open your GitLab fork's web URL instead (printed in the GitOps
+> bootstrap banner). Ports 30000 (casino) and 30002 (Argo CD) are unchanged.
 
 1. Open Gitea at http://localhost:30001 and sign in.
 2. Find the repo `casino/casino` — it contains the Kubernetes manifests for
@@ -167,19 +176,20 @@ self-heal would revert it anyway).
 
 ## 5. Play the casino
 
-The casino UI is the frontend service (`vegas-casino-frontend`, port 3000).
-Bring it up on your laptop through a port-forward:
+The casino frontend (`vegas-casino-frontend`) is exposed through the Gateway API
+data plane on **NodePort 30000** — no `kubectl port-forward` needed. In the
+Codespaces **Ports** panel it shows up labelled **Casino app**; click the globe
+icon on port **30000** (or open **http://localhost:30000**).
 
-```bash
-kubectl -n casino port-forward deploy/vegas-casino-frontend 3000:3000
-```
-
-Open http://localhost:3000, register a player account, and play a few rounds —
+Open http://localhost:30000, register a player account, and play a few rounds —
 try the slots and another game. Any game works; the point is generating
 telemetry.
 
-Keep the port-forward terminal open and use a **second terminal** (+ icon)
-for everything else.
+> 30000 is published by the kind control-plane node and forwarded to the
+> codespace, the same way the Gitea (30001) and Argo CD (30002) UIs are.
+
+Leave the casino open in a browser tab and use a terminal (+ icon) for
+everything else.
 
 Sanity-check the entry point from inside the cluster:
 
@@ -209,7 +219,7 @@ the gateway log.
 - [ ] All pods Running in `casino`, `observability`, `dynatrace`, `gitea`, `argocd`
 - [ ] Your cluster appears under **Infrastructure → Kubernetes** in Dynatrace
 - [ ] Gitea reachable at http://localhost:30001, repo `casino/casino` visible
-- [ ] Casino UI reachable at http://localhost:3000 and you played a round
+- [ ] Casino UI reachable at http://localhost:30000 and you played a round
 - [ ] `otel-gateway` log shows no export errors
 
 Stuck? Check the [Troubleshooting](troubleshooting.md) page, or flag a helper.
