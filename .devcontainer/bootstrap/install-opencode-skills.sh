@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# install-opencode-skills.sh — install ready-made Dynatrace Agent Skills into the
-# attendee codespace so opencode can operate Dynatrace and reason about its data
-# (ISI-7169 B2/B3). We INSTALL published skills, we do not author them.
+# install-opencode-skills.sh — install ready-made observability Agent Skills into
+# the attendee codespace so opencode can instrument services, reason about OTel
+# pipelines, and operate Dynatrace (ISI-7169 B2/B3, ISI-7563). We INSTALL
+# published skills, we do not author them.
 #
 # WHICH SKILLS -----------------------------------------------------------------
 # Driven by the SKILLS array below — one `owner/repo@ref` entry per skill repo.
@@ -9,8 +10,13 @@
 # opencode skills directory. Pins are git tags so every attendee gets the exact
 # same content (AC: "pin/record the skill version").
 #
-#   ISI-7177 (B3)  Dynatrace/dynatrace-for-ai  — DQL syntax, observability
+#   ISI-7177 (B3)  Dynatrace/dynatrace-for-ai        — DQL syntax, observability
 #                   patterns, Kubernetes/cloud context (38 dt-* domain skills).
+#   ISI-7563       henrikrexed/observability-agent-skills — OTel instrumentation,
+#                   OTTL/collector transforms, Dynatrace observability patterns
+#                   (otel-instrumentation, otel-ottl, otel-dynatrace). This is
+#                   the advanced-lab warmup skill the attendee ALSO installs
+#                   interactively; this installer is the deterministic fallback.
 #
 # The sibling dtctl Agent Skill (ISI-7176/B2) is installed separately by
 # install-dtctl-skill.sh, which uses dtctl's own native `dtctl skills install`
@@ -51,7 +57,8 @@ warn() { echo "==> opencode-skills: WARN: $*" >&2; }
 # Keep each pin on its own line so sibling tickets add exactly one line (minimal
 # merge surface). Record the pin here AND in the per-skill .installed-from marker.
 SKILLS=(
-  "Dynatrace/dynatrace-for-ai@v10.0.0"   # ISI-7177 (B3) — DQL + observability + k8s domain skills
+  "Dynatrace/dynatrace-for-ai@v10.0.0"               # ISI-7177 (B3) — DQL + observability + k8s domain skills
+  "henrikrexed/observability-agent-skills@v1.0.0"    # ISI-7563 — OTel instrumentation / OTTL / Dynatrace (warmup skill, 3 skills)
   # (dtctl skill is handled by install-dtctl-skill.sh, not this list.)
 )
 

@@ -21,9 +21,20 @@
 #   1  one or more required skills missing or malformed
 set -uo pipefail
 
-# Representative required skills from Dynatrace/dynatrace-for-ai — one per domain
-# the B3 ticket names. Override with OPENCODE_REQUIRED_SKILLS="a b c".
-read -r -a REQUIRED_SKILLS <<< "${OPENCODE_REQUIRED_SKILLS:-dt-dql-essentials dt-obs-kubernetes dt-obs-services}"
+# Required skills, grouped by the three families M0 readiness must surface
+# (ISI-7563): the OTel observability warmup skills, the Dynatrace-for-AI domain
+# skills, and the embedded dtctl skill. Each entry is "Family label|sk1 sk2 ..."
+# — a representative skill per family (full sets are large; one proves the dir
+# installed and loads). Override the WHOLE set with OPENCODE_REQUIRED_SKILLS to
+# collapse back to a single flat group (back-compat with the old behaviour).
+SKILL_GROUPS=(
+  "observability-agent-skills (ISI-7563)|otel-instrumentation otel-ottl otel-dynatrace"
+  "Dynatrace-for-AI (ISI-7177)|dt-dql-essentials dt-obs-kubernetes dt-obs-services"
+  "dtctl skill (ISI-7176)|dtctl"
+)
+if [[ -n "${OPENCODE_REQUIRED_SKILLS:-}" ]]; then
+  SKILL_GROUPS=("override|${OPENCODE_REQUIRED_SKILLS}")
+fi
 
 # opencode GLOBAL skills directories, in the precedence order opencode scans.
 # (Project-level .opencode/skills etc. also work but bootstrap installs globally.)
@@ -39,7 +50,7 @@ ok()   { printf '  \033[1;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '  \033[1;33m!\033[0m %s\n' "$*" >&2; }
 bad()  { printf '  \033[1;31m✗\033[0m %s\n' "$*" >&2; }
 
-bold "== opencode Dynatrace-for-AI skills verify =="
+bold "== opencode lab-readiness skills verify =="
 
 # Bonus (non-gating): show opencode version if the binary is runnable.
 if command -v opencode >/dev/null 2>&1; then
@@ -69,19 +80,24 @@ has_valid_frontmatter() {
 }
 
 missing=0
-for sk in "${REQUIRED_SKILLS[@]}"; do
-  if md="$(find_skill_md "$sk")"; then
-    if has_valid_frontmatter "$md"; then
-      pin="$(cat "$(dirname "$md")/.installed-from" 2>/dev/null || echo 'unpinned')"
-      ok "${sk}: loadable (${md#"$HOME"/}) [${pin}]"
+for group in "${SKILL_GROUPS[@]}"; do
+  label="${group%%|*}"
+  read -r -a skills <<< "${group#*|}"
+  bold "-- ${label} --"
+  for sk in "${skills[@]}"; do
+    if md="$(find_skill_md "$sk")"; then
+      if has_valid_frontmatter "$md"; then
+        pin="$(cat "$(dirname "$md")/.installed-from" 2>/dev/null || echo 'unpinned')"
+        ok "${sk}: loadable (${md#"$HOME"/}) [${pin}]"
+      else
+        bad "${sk}: SKILL.md present but frontmatter invalid (${md}) — opencode will skip it"
+        missing=$((missing + 1))
+      fi
     else
-      bad "${sk}: SKILL.md present but frontmatter invalid (${md}) — opencode will skip it"
+      bad "${sk}: not found in any opencode skills directory"
       missing=$((missing + 1))
     fi
-  else
-    bad "${sk}: not found in any opencode skills directory"
-    missing=$((missing + 1))
-  fi
+  done
 done
 
 # Show the recorded pin manifest if present.
@@ -94,15 +110,17 @@ for dir in "${CANDIDATE_DIRS[@]}"; do
 done
 
 if [[ "$missing" -ne 0 ]]; then
-  bad "RESULT: ${missing} required Dynatrace-for-AI skill(s) missing/malformed"
+  bad "RESULT: ${missing} required lab-readiness skill(s) missing/malformed"
   cat >&2 <<EOF
 
-The opencode Dynatrace-for-AI skills did not install. The install step is
-non-fatal, so bootstrap continued without them. (Re)install with:
+One or more opencode lab-readiness skills did not install. The install steps
+are non-fatal, so bootstrap continued without them. (Re)install with:
 
-  bash .devcontainer/bootstrap/install-opencode-skills.sh
+  bash .devcontainer/bootstrap/install-opencode-skills.sh   # observability + Dynatrace-for-AI
+  bash .devcontainer/bootstrap/install-dtctl-skill.sh        # dtctl embedded skill
 
-Behind a proxy / in an air-gapped region, point it at a reachable source:
+Behind a proxy / in an air-gapped region, point the tarball installer at a
+reachable source:
 
   OPENCODE_SKILLS_SRC_DIR=<local checkout of the repo> \\
     bash .devcontainer/bootstrap/install-opencode-skills.sh
@@ -110,5 +128,5 @@ EOF
   exit 1
 fi
 
-bold "RESULT: Dynatrace-for-AI skills OK (opencode will load them)"
+bold "RESULT: all lab-readiness skills OK (opencode will load them)"
 exit 0
