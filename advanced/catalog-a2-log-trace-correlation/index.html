@@ -1,0 +1,975 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Attendee lab walkthrough for the 3h Dynatrace Perform hands-on OpenTelemetry training on the Vegas Casino" name="description"/>
+<meta content="Henrik Rexed / IsItObservable" name="author"/>
+<link href="../catalog-a1-broken-trace/" rel="prev"/>
+<link href="../catalog-a3-multi-language/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>A2 — Log ↔ trace correlation [20m][med] - Beyond the Honeymoon — OTel in Practice</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="cyan" data-md-color-primary="deep-purple" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#catalog-a2-log-trace-correlation">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="Beyond the Honeymoon — OTel in Practice" class="md-header__button md-logo" data-md-component="logo" href="../.." title="Beyond the Honeymoon — OTel in Practice">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            Beyond the Honeymoon — OTel in Practice
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              A2 — Log ↔ trace correlation [20m][med]
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="cyan" data-md-color-media="" data-md-color-primary="deep-purple" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="cyan" data-md-color-media="" data-md-color-primary="deep-purple" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+<div class="md-search__suggest" data-md-component="search-suggest"></div>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Welcome
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../setup/">
+        
+  
+  
+    
+  
+  M0 — Environment Setup
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-1/">
+        
+  
+  
+    
+  
+  M1 — Tour the broken casino
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-2/">
+        
+  
+  
+    
+  
+  M2 — SDK configuration by file
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-3/">
+        
+  
+  
+    
+  
+  M3 — The collector as control point
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-4/">
+        
+  
+  
+    
+  
+  M4 — Sampling: cost/fidelity strategy
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-5/">
+        
+  
+  
+    
+  
+  M5 — Operating at scale
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../troubleshooting/">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../getting-started/">
+          
+  
+  
+  Advanced self-paced track
+
+        </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="Beyond the Honeymoon — OTel in Practice" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="Beyond the Honeymoon — OTel in Practice">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    Beyond the Honeymoon — OTel in Practice
+  </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Welcome
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../setup/">
+<span class="md-ellipsis">
+    
+  
+    M0 — Environment Setup
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-1/">
+<span class="md-ellipsis">
+    
+  
+    M1 — Tour the broken casino
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-2/">
+<span class="md-ellipsis">
+    
+  
+    M2 — SDK configuration by file
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-3/">
+<span class="md-ellipsis">
+    
+  
+    M3 — The collector as control point
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-4/">
+<span class="md-ellipsis">
+    
+  
+    M4 — Sampling: cost/fidelity strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-5/">
+<span class="md-ellipsis">
+    
+  
+    M5 — Operating at scale
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../troubleshooting/">
+<span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Advanced self-paced track
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced self-paced track
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../getting-started/">
+<span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../environment/">
+<span class="md-ellipsis">
+    
+  
+    The environment
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-0-warmup/">
+<span class="md-ellipsis">
+    
+  
+    Step 0 — Warmup
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-1-instrument-with-agents/">
+<span class="md-ellipsis">
+    
+  
+    Step 1 — Instrument with AI agents
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-2-business-metrics/">
+<span class="md-ellipsis">
+    
+  
+    Step 2 — Business metrics
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-3-weaver-pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Step 3 — Weaver pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-4-cost-of-observability/">
+<span class="md-ellipsis">
+    
+  
+    Step 4 — Cost of observability
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-5-high-cardinality/">
+<span class="md-ellipsis">
+    
+  
+    Step 5 — High-cardinality metrics
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-6-pii-logs/">
+<span class="md-ellipsis">
+    
+  
+    Step 6 — PII in logs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-7-tail-sampling/">
+<span class="md-ellipsis">
+    
+  
+    Step 7 — Tail sampling
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_9_11" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9_11" id="__nav_9_11_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Catalog (extra exercises)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_9_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_9_11">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Catalog (extra exercises)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-a1-broken-trace/">
+<span class="md-ellipsis">
+    
+  
+    A1 — Fix a broken trace [25m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    A2 — Log ↔ trace correlation [20m][med]
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    A2 — Log ↔ trace correlation [20m][med]
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-concept">
+<span class="md-ellipsis">
+      
+        The concept
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-problem-the-log-line-has-no-trace-context">
+<span class="md-ellipsis">
+      
+        ① Problem — the log line has no trace context
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-understand-the-change">
+<span class="md-ellipsis">
+      
+        ② Understand the change
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-drive-opencode-the-prompt-ladder">
+<span class="md-ellipsis">
+      
+        ③ Drive opencode — the prompt ladder
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#4-review-apply">
+<span class="md-ellipsis">
+      
+        ④ Review &amp; apply
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#verify">
+<span class="md-ellipsis">
+      
+        Verify
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#definition-of-done">
+<span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-a3-multi-language/">
+<span class="md-ellipsis">
+    
+  
+    A3 — Multi-language instrumentation [25m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-b1-spanmetrics/">
+<span class="md-ellipsis">
+    
+  
+    B1 — RED metrics from spans [20m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-b3-filter-drop-noise/">
+<span class="md-ellipsis">
+    
+  
+    B3 — Drop noise (filter) [15m][easy]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-c1-dtctl-dashboard/">
+<span class="md-ellipsis">
+    
+  
+    C1 — Dashboard via dtctl [20m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-concept">
+<span class="md-ellipsis">
+      
+        The concept
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-problem-the-log-line-has-no-trace-context">
+<span class="md-ellipsis">
+      
+        ① Problem — the log line has no trace context
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-understand-the-change">
+<span class="md-ellipsis">
+      
+        ② Understand the change
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-drive-opencode-the-prompt-ladder">
+<span class="md-ellipsis">
+      
+        ③ Drive opencode — the prompt ladder
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#4-review-apply">
+<span class="md-ellipsis">
+      
+        ④ Review &amp; apply
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#verify">
+<span class="md-ellipsis">
+      
+        Verify
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#definition-of-done">
+<span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="catalog-a2-log-trace-correlation">Catalog A2 — Log ↔ trace correlation</h1>
+<div class="admonition abstract">
+<p class="admonition-title">At a glance</p>
+<p><strong>Theme:</strong> traces / logs · <strong>Time:</strong> 20 min · <strong>Difficulty:</strong> medium ·
+<strong>Skill:</strong> <code>otel-instrumentation</code> ·
+<strong>Reference:</strong> <code>labs/advanced/catalog-a2-log-trace-correlation/</code></p>
+</div>
+<p><strong>Goal:</strong> the slots service logs each spin as a structured JSON line, but the
+line carries no trace context — so in Dynatrace a log record and the span it was
+emitted during are unlinked. You will use <code>opencode</code> with the
+<code>otel-instrumentation</code> skill to inject <code>trace_id</code> / <code>span_id</code> into every log
+line, then watch Dynatrace pivot from a slow <code>/spin</code> trace <strong>straight to its
+logs</strong> — and back. You run the <strong>Problem → Opencode → Verify</strong> loop, driving the
+agent with a numbered prompt <strong>ladder</strong> rather than one mega-prompt.</p>
+<h2 id="the-concept">The concept</h2>
+<div class="mermaid">flowchart TB
+  subgraph before["Before — two unlinked panes"]
+    tb["Trace: POST /spin<br/>casino.slots.spin"]
+    lb["Log: 'spin settled'<br/>(no trace_id)"]
+    tb -. "no link" .- lb
+  end
+  subgraph after["After — one click between them"]
+    ta["Trace: POST /spin<br/>casino.slots.spin"]
+    la["Log: 'spin settled'<br/>trace_id + span_id"]
+    ta &lt;--&gt; la
+  end
+</div>
+<h2 id="1-problem-the-log-line-has-no-trace-context">① Problem — the log line has no trace context</h2>
+<p>After a spin settles, the slots service writes a structured JSON log line to
+stdout — scraped by the DaemonSet filelog collector and shipped to Dynatrace.
+Planted state: <code>labs/advanced/catalog-a2-log-trace-correlation/before.slots-logger.js</code>.
+The line is emitted <strong>while</strong> the <code>casino.slots.spin</code> span is active, yet it
+records none of that span's identity:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"timestamp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"…"</span><span class="p">,</span><span class="w"> </span><span class="nt">"level"</span><span class="p">:</span><span class="w"> </span><span class="s2">"info"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"spin settled"</span><span class="p">,</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="w">  </span><span class="nt">"service.name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"vegas-slots-service"</span><span class="p">,</span><span class="w"> </span><span class="nt">"casino.outcome"</span><span class="p">:</span><span class="w"> </span><span class="s2">"jackpot"</span><span class="w"> </span><span class="p">}</span>
+</code></pre></div>
+<p>No <code>trace_id</code>, no <code>span_id</code>. In Dynatrace the log and the span live in two
+separate panes with nothing linking them: opening a slow <code>/spin</code> trace cannot
+pivot to "the logs for THIS request", and a suspicious log line cannot jump to
+the trace that produced it.</p>
+<p>Confirm the symptom — run the <a href="#verify">checkpoint DQL</a> now: the share of
+slots log records with a <code>trace_id</code> is <strong>zero</strong>.</p>
+<h2 id="2-understand-the-change">② Understand the change</h2>
+<p>The fix is to read the <strong>active</strong> span's <code>SpanContext</code> and stamp its ids onto
+every log line. Two facts make this work:</p>
+<ol>
+<li><code>trace_id</code> and <code>span_id</code> are the OpenTelemetry <strong>log data-model</strong> trace-context
+   fields. Dynatrace correlates a log record to a span when they are present —
+   no extra configuration.</li>
+<li>A logger that writes plain JSON to stdout does <strong>not</strong> attach them
+   automatically. You read them from
+   <code>trace.getSpan(context.active()).spanContext()</code> and inject them yourself.</li>
+</ol>
+<p>Target shape (<code>after.slots-logger.js</code>):</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="gi">+ const { trace, context } = require('@opentelemetry/api');</span>
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a>
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="w"> </span> function log(level, message, fields = {}) {
+<a href="#__codelineno-1-4" id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="gi">+   const span = trace.getSpan(context.active());</span>
+<a href="#__codelineno-1-5" id="__codelineno-1-5" name="__codelineno-1-5"></a><span class="gi">+   const sc = span &amp;&amp; span.spanContext();</span>
+<a href="#__codelineno-1-6" id="__codelineno-1-6" name="__codelineno-1-6"></a><span class="gi">+   const correlation = sc</span>
+<a href="#__codelineno-1-7" id="__codelineno-1-7" name="__codelineno-1-7"></a><span class="gi">+     ? { trace_id: sc.traceId, span_id: sc.spanId, trace_flags: sc.traceFlags }</span>
+<a href="#__codelineno-1-8" id="__codelineno-1-8" name="__codelineno-1-8"></a><span class="gi">+     : {};</span>
+<a href="#__codelineno-1-9" id="__codelineno-1-9" name="__codelineno-1-9"></a><span class="w"> </span>   process.stdout.write(JSON.stringify({
+<a href="#__codelineno-1-10" id="__codelineno-1-10" name="__codelineno-1-10"></a><span class="w"> </span>     timestamp: new Date().toISOString(), level, message,
+<a href="#__codelineno-1-11" id="__codelineno-1-11" name="__codelineno-1-11"></a><span class="w"> </span>     'service.name': 'vegas-slots-service',
+<a href="#__codelineno-1-12" id="__codelineno-1-12" name="__codelineno-1-12"></a><span class="gi">+     ...correlation,</span>
+<a href="#__codelineno-1-13" id="__codelineno-1-13" name="__codelineno-1-13"></a><span class="w"> </span>     ...fields,
+<a href="#__codelineno-1-14" id="__codelineno-1-14" name="__codelineno-1-14"></a><span class="w"> </span>   }) + '\n');
+<a href="#__codelineno-1-15" id="__codelineno-1-15" name="__codelineno-1-15"></a><span class="w"> </span> }
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Use the standard keys, top-level</p>
+<p>The correlation keys Dynatrace recognises are the lower-snake-case
+<strong><code>trace_id</code></strong> / <strong><code>span_id</code></strong>, as <strong>top-level</strong> fields on the log record.
+Nesting them under an object, or renaming to <code>traceId</code> / <code>dt.trace_id</code>,
+breaks the link. When no span is active, omit the fields — never log a
+fabricated or all-zero id.</p>
+</div>
+<h2 id="3-drive-opencode-the-prompt-ladder">③ Drive opencode — the prompt ladder</h2>
+<p>Climb the ladder one rung at a time. After each rung, read what the agent did
+before you let it continue.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio"/><input id="__tabbed_1_2" name="__tabbed_1" type="radio"/><input id="__tabbed_1_3" name="__tabbed_1" type="radio"/><input id="__tabbed_1_4" name="__tabbed_1" type="radio"/><div class="tabbed-labels"><label for="__tabbed_1_1">P1 · Orient (read-only)</label><label for="__tabbed_1_2">P2 · Core fix</label><label for="__tabbed_1_3">P3 · Deepen</label><label for="__tabbed_1_4">P4 · Steer</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p><div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>Using the otel-instrumentation skill, read the slots service logger only — do
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>not edit. The service logs each spin while a casino.slots.spin span is active,
+<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a>yet the log line has no trace_id. Explain why Dynatrace cannot link that log
+<a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a>record to its span.
+</code></pre></div>
+<strong>What you should see:</strong> the agent identifies that the logger never reads the
+active span context, so the ids are absent from the record.
+<strong>Review check:</strong> it names <code>trace_id</code> / <code>span_id</code> as the missing correlation
+fields — not "a missing log attribute" in general.</p>
+</div>
+<div class="tabbed-block">
+<p><div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>Now fix it: read the active span's SpanContext via
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a>trace.getSpan(context.active()) and inject trace_id, span_id and trace_flags
+<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a>as top-level fields on every structured log line. Use @opentelemetry/api.
+<a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a>If no span is active, omit the fields — do not log zeros.
+</code></pre></div>
+<strong>What you should see:</strong> <code>trace.getSpan(context.active())</code> read inside the log
+helper; the three ids spread onto the JSON object.
+<strong>Review check:</strong> the keys are exactly <code>trace_id</code> / <code>span_id</code> (snake_case),
+top-level — not nested, not camelCase.</p>
+</div>
+<div class="tabbed-block">
+<p><div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>Make it safe: when there is no active span (startup, background ticks) the
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a>line must still be valid JSON with no correlation keys. Confirm trace_flags is
+<a href="#__codelineno-4-3" id="__codelineno-4-3" name="__codelineno-4-3"></a>included so sampled/unsampled is visible on the record.
+</code></pre></div>
+<strong>What you should see:</strong> a guarded branch that omits the ids when no span is
+active; <code>trace_flags</code> present when one is.
+<strong>Review check:</strong> no all-zero <code>00000000...</code> id is ever emitted.</p>
+</div>
+<div class="tabbed-block">
+<p><div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a>Confirm the correlation keys match what Dynatrace expects: top-level trace_id
+<a href="#__codelineno-5-2" id="__codelineno-5-2" name="__codelineno-5-2"></a>and span_id in lower snake_case. Show me they are NOT nested under an object
+<a href="#__codelineno-5-3" id="__codelineno-5-3" name="__codelineno-5-3"></a>and NOT renamed to traceId / dt.trace_id.
+</code></pre></div>
+<strong>What you should see:</strong> the agent re-reads the emitted object and confirms the
+key names and placement.
+<strong>Review check:</strong> the ids survive as top-level fields after <code>...fields</code> spread
+(a later field cannot clobber them).</p>
+</div>
+</div>
+</div>
+<h2 id="4-review-apply">④ Review &amp; apply</h2>
+<p>Read the diff against <code>after.slots-logger.js</code>, then ship via GitOps:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a>git<span class="w"> </span>add<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"feat(slots): inject trace_id/span_id into logs for correlation"</span>
+<a href="#__codelineno-6-2" id="__codelineno-6-2" name="__codelineno-6-2"></a>git<span class="w"> </span>push<span class="w">            </span><span class="c1"># to your fork's main — Argo CD syncs the slots service</span>
+</code></pre></div>
+<p>Play a few rounds of slots so new, correlated log lines flow.</p>
+<h2 id="verify">Verify</h2>
+<p>Run in a Grail <strong>Notebook</strong>, filtered to your cluster.</p>
+<p><strong>Share of slots logs carrying a trace id</strong> (climbs from 0 toward 1.0):</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a>fetch logs, from: now() - 30m
+<a href="#__codelineno-7-2" id="__codelineno-7-2" name="__codelineno-7-2"></a>| filter service.name == "vegas-slots-service"
+<a href="#__codelineno-7-3" id="__codelineno-7-3" name="__codelineno-7-3"></a>| fieldsAdd correlated = isNotNull(trace_id)
+<a href="#__codelineno-7-4" id="__codelineno-7-4" name="__codelineno-7-4"></a>| summarize correlated = countIf(correlated == true), total = count(), by: { bin(timestamp, 1m) }
+<a href="#__codelineno-7-5" id="__codelineno-7-5" name="__codelineno-7-5"></a>| fieldsAdd ratio = correlated / total
+</code></pre></div>
+<p><strong>The pivot that proves it</strong> — pick one spin's <code>trace_id</code> and fetch its logs:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a>fetch logs, from: now() - 30m
+<a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a>| filter service.name == "vegas-slots-service" and isNotNull(trace_id)
+<a href="#__codelineno-8-3" id="__codelineno-8-3" name="__codelineno-8-3"></a>| fields timestamp, trace_id, span_id, content
+<a href="#__codelineno-8-4" id="__codelineno-8-4" name="__codelineno-8-4"></a>| sort timestamp desc
+<a href="#__codelineno-8-5" id="__codelineno-8-5" name="__codelineno-8-5"></a>| limit 20
+</code></pre></div>
+<ul>
+<li><strong>Before:</strong> <code>ratio</code> is 0 — every slots log is orphaned from its trace.</li>
+<li><strong>After:</strong> <code>ratio</code> climbs toward 1.0, and in the trace view opening any <code>/spin</code>
+  trace now shows a <strong>Logs</strong> tab scoped to that <code>trace_id</code> — one click from span
+  to the exact lines it produced, and the log view links back to the trace.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">If the agent gets it wrong — steer it back</p>
+<ul>
+<li><strong>Logs the ids nested or renamed</strong> (<code>{ otel: { traceId } }</code>, <code>dt.trace_id</code>):
+  <em>"the correlation keys are top-level trace_id and span_id in lower
+  snake_case — Dynatrace does not recognise nested or camelCase variants."</em></li>
+<li><strong>Reads the span at module load, not per-call:</strong> <em>"read the active span
+  inside the log function, per line — the active span changes every request."</em></li>
+<li><strong>Emits an all-zero id when no span is active:</strong> <em>"omit the correlation keys
+  entirely when there is no active span; never log an all-zero trace_id."</em></li>
+<li><strong>Puts <code>...correlation</code> after <code>...fields</code>:</strong> <em>"spread correlation last-ish but
+  ensure a caller field cannot overwrite trace_id/span_id."</em></li>
+</ul>
+</div>
+<h2 id="definition-of-done">Definition of done</h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> <code>trace_id</code>, <code>span_id</code>, <code>trace_flags</code> injected as top-level log fields</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> Ids read from the <strong>active</strong> span per log call (not at module load)</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> No correlation keys (and no all-zero ids) when no span is active</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> <code>ratio</code> DQL climbs toward 1.0 after the fix</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> Opening a <code>/spin</code> trace in Dynatrace shows its logs scoped to that <code>trace_id</code></li>
+</ul>
+<p>Back to the <a href="../catalog/">catalog menu</a>.</p>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<nav aria-label="Footer" class="md-footer__inner md-grid">
+<a aria-label="Previous: A1 — Fix a broken trace [25m][med]" class="md-footer__link md-footer__link--prev" href="../catalog-a1-broken-trace/">
+<div class="md-footer__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</div>
+<div class="md-footer__title">
+<span class="md-footer__direction">
+                Previous
+              </span>
+<div class="md-ellipsis">
+                A1 — Fix a broken trace [25m][med]
+              </div>
+</div>
+</a>
+<a aria-label="Next: A3 — Multi-language instrumentation [25m][med]" class="md-footer__link md-footer__link--next" href="../catalog-a3-multi-language/">
+<div class="md-footer__title">
+<span class="md-footer__direction">
+                Next
+              </span>
+<div class="md-ellipsis">
+                A3 — Multi-language instrumentation [25m][med]
+              </div>
+</div>
+<div class="md-footer__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"></path></svg>
+</div>
+</a>
+</nav>
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.top", "navigation.tracking", "navigation.footer", "search.suggest", "search.highlight", "content.code.annotate", "content.code.copy", "content.tooltips"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+mermaid.initialize({
+    theme: (window.matchMedia && JSON.parse(window.localStorage.getItem("__palette") || "{}")?.color?.scheme === "slate") ? "dark" : "default"
+});</script></body>
+</html>

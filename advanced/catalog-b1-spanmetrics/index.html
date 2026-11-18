@@ -1,0 +1,946 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Attendee lab walkthrough for the 3h Dynatrace Perform hands-on OpenTelemetry training on the Vegas Casino" name="description"/>
+<meta content="Henrik Rexed / IsItObservable" name="author"/>
+<link href="../catalog-a3-multi-language/" rel="prev"/>
+<link href="../catalog-b3-filter-drop-noise/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>B1 — RED metrics from spans [20m][med] - Beyond the Honeymoon — OTel in Practice</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="cyan" data-md-color-primary="deep-purple" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#catalog-b1-red-metrics-from-spans">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="Beyond the Honeymoon — OTel in Practice" class="md-header__button md-logo" data-md-component="logo" href="../.." title="Beyond the Honeymoon — OTel in Practice">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            Beyond the Honeymoon — OTel in Practice
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              B1 — RED metrics from spans [20m][med]
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="cyan" data-md-color-media="" data-md-color-primary="deep-purple" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="cyan" data-md-color-media="" data-md-color-primary="deep-purple" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+<div class="md-search__suggest" data-md-component="search-suggest"></div>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Welcome
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../setup/">
+        
+  
+  
+    
+  
+  M0 — Environment Setup
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-1/">
+        
+  
+  
+    
+  
+  M1 — Tour the broken casino
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-2/">
+        
+  
+  
+    
+  
+  M2 — SDK configuration by file
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-3/">
+        
+  
+  
+    
+  
+  M3 — The collector as control point
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-4/">
+        
+  
+  
+    
+  
+  M4 — Sampling: cost/fidelity strategy
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-5/">
+        
+  
+  
+    
+  
+  M5 — Operating at scale
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../troubleshooting/">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../getting-started/">
+          
+  
+  
+  Advanced self-paced track
+
+        </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="Beyond the Honeymoon — OTel in Practice" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="Beyond the Honeymoon — OTel in Practice">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    Beyond the Honeymoon — OTel in Practice
+  </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Welcome
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../setup/">
+<span class="md-ellipsis">
+    
+  
+    M0 — Environment Setup
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-1/">
+<span class="md-ellipsis">
+    
+  
+    M1 — Tour the broken casino
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-2/">
+<span class="md-ellipsis">
+    
+  
+    M2 — SDK configuration by file
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-3/">
+<span class="md-ellipsis">
+    
+  
+    M3 — The collector as control point
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-4/">
+<span class="md-ellipsis">
+    
+  
+    M4 — Sampling: cost/fidelity strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-5/">
+<span class="md-ellipsis">
+    
+  
+    M5 — Operating at scale
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../troubleshooting/">
+<span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Advanced self-paced track
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced self-paced track
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../getting-started/">
+<span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../environment/">
+<span class="md-ellipsis">
+    
+  
+    The environment
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-0-warmup/">
+<span class="md-ellipsis">
+    
+  
+    Step 0 — Warmup
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-1-instrument-with-agents/">
+<span class="md-ellipsis">
+    
+  
+    Step 1 — Instrument with AI agents
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-2-business-metrics/">
+<span class="md-ellipsis">
+    
+  
+    Step 2 — Business metrics
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-3-weaver-pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Step 3 — Weaver pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-4-cost-of-observability/">
+<span class="md-ellipsis">
+    
+  
+    Step 4 — Cost of observability
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-5-high-cardinality/">
+<span class="md-ellipsis">
+    
+  
+    Step 5 — High-cardinality metrics
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-6-pii-logs/">
+<span class="md-ellipsis">
+    
+  
+    Step 6 — PII in logs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-7-tail-sampling/">
+<span class="md-ellipsis">
+    
+  
+    Step 7 — Tail sampling
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_9_11" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9_11" id="__nav_9_11_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Catalog (extra exercises)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_9_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_9_11">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Catalog (extra exercises)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-a1-broken-trace/">
+<span class="md-ellipsis">
+    
+  
+    A1 — Fix a broken trace [25m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-a2-log-trace-correlation/">
+<span class="md-ellipsis">
+    
+  
+    A2 — Log ↔ trace correlation [20m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-a3-multi-language/">
+<span class="md-ellipsis">
+    
+  
+    A3 — Multi-language instrumentation [25m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    B1 — RED metrics from spans [20m][med]
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    B1 — RED metrics from spans [20m][med]
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-concept">
+<span class="md-ellipsis">
+      
+        The concept
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-problem-rich-traces-no-red-rollup">
+<span class="md-ellipsis">
+      
+        ① Problem — rich traces, no RED rollup
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-understand-the-change">
+<span class="md-ellipsis">
+      
+        ② Understand the change
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-drive-opencode-the-prompt-ladder">
+<span class="md-ellipsis">
+      
+        ③ Drive opencode — the prompt ladder
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#4-review-apply">
+<span class="md-ellipsis">
+      
+        ④ Review &amp; apply
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#verify">
+<span class="md-ellipsis">
+      
+        Verify
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#definition-of-done">
+<span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-b3-filter-drop-noise/">
+<span class="md-ellipsis">
+    
+  
+    B3 — Drop noise (filter) [15m][easy]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-c1-dtctl-dashboard/">
+<span class="md-ellipsis">
+    
+  
+    C1 — Dashboard via dtctl [20m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-concept">
+<span class="md-ellipsis">
+      
+        The concept
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-problem-rich-traces-no-red-rollup">
+<span class="md-ellipsis">
+      
+        ① Problem — rich traces, no RED rollup
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-understand-the-change">
+<span class="md-ellipsis">
+      
+        ② Understand the change
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-drive-opencode-the-prompt-ladder">
+<span class="md-ellipsis">
+      
+        ③ Drive opencode — the prompt ladder
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#4-review-apply">
+<span class="md-ellipsis">
+      
+        ④ Review &amp; apply
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#verify">
+<span class="md-ellipsis">
+      
+        Verify
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#definition-of-done">
+<span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="catalog-b1-red-metrics-from-spans">Catalog B1 — RED metrics from spans</h1>
+<div class="admonition abstract">
+<p class="admonition-title">At a glance</p>
+<p><strong>Theme:</strong> metrics / collector · <strong>Time:</strong> 20 min · <strong>Difficulty:</strong> medium ·
+<strong>Skill:</strong> <code>otel-collector</code> ·
+<strong>Reference:</strong> <code>labs/advanced/catalog-b1-spanmetrics/</code></p>
+</div>
+<p><strong>Goal:</strong> get <strong>RED</strong> metrics — Rate, Errors, Duration — for every casino
+operation <strong>without touching application code</strong>, by adding the <code>spanmetrics</code>
+connector to the gateway collector. You drive <code>opencode</code> with the
+<code>otel-collector</code> skill through a prompt <strong>ladder</strong>, then chart the result.</p>
+<h2 id="the-concept">The concept</h2>
+<div class="mermaid">flowchart LR
+  spans["Span stream<br/>(all services)"] --&gt; conn["spanmetrics<br/>connector"]
+  conn --&gt; calls["casino.red.calls<br/>(Rate + Errors)"]
+  conn --&gt; dur["casino.red.duration<br/>(Duration histogram)"]
+  calls --&gt; dt["Dynatrace"]
+  dur --&gt; dt
+</div>
+<p>A connector is both an exporter and a receiver: it consumes the trace pipeline's
+spans and produces a metrics stream. You get RED for free from telemetry you are
+already sending — no SDK change, no redeploy of the casino services.</p>
+<h2 id="1-problem-rich-traces-no-red-rollup">① Problem — rich traces, no RED rollup</h2>
+<p>The casino emits detailed spans, but there is <strong>no cheap aggregate</strong> of request
+rate, error rate, or latency distribution per operation. Answering "what is the
+p90 of <code>POST /spin</code> and how many are erroring per minute?" means scanning spans —
+expensive and slow for a dashboard or SLO. Confirm it: run the
+<a href="#verify">checkpoint DQL</a> for <code>casino.red.calls</code> now — <strong>no such metric</strong>.</p>
+<h2 id="2-understand-the-change">② Understand the change</h2>
+<p>Add the <code>spanmetrics</code> connector to <code>observability/collectors/gateway.yaml</code>
+(reference: <code>labs/advanced/catalog-b1-spanmetrics/spanmetrics-connector.yaml</code>).
+It is wired as an <strong>exporter on the traces pipeline</strong> and a <strong>receiver on a new
+metrics pipeline</strong>:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="nt">connectors</span><span class="p">:</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="w">  </span><span class="nt">spanmetrics</span><span class="p">:</span>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="w">    </span><span class="nt">histogram</span><span class="p">:</span>
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a><span class="w">      </span><span class="nt">explicit</span><span class="p">:</span>
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a><span class="w">        </span><span class="nt">buckets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1ms</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">5ms</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">10ms</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">25ms</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">50ms</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">100ms</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">250ms</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">500ms</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1s</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2s</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">5s</span><span class="p p-Indicator">]</span>
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a><span class="w">    </span><span class="nt">dimensions</span><span class="p">:</span>
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">casino.game.name</span>
+<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">casino.outcome</span>
+<a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a><span class="w">    </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">casino.red</span>
+<a href="#__codelineno-0-10" id="__codelineno-0-10" name="__codelineno-0-10"></a><span class="w">    </span><span class="nt">aggregation_temporality</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AGGREGATION_TEMPORALITY_DELTA</span><span class="w">   </span><span class="c1"># match tenant delta convention</span>
+<a href="#__codelineno-0-11" id="__codelineno-0-11" name="__codelineno-0-11"></a><span class="nt">service</span><span class="p">:</span>
+<a href="#__codelineno-0-12" id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="w">  </span><span class="nt">pipelines</span><span class="p">:</span>
+<a href="#__codelineno-0-13" id="__codelineno-0-13" name="__codelineno-0-13"></a><span class="w">    </span><span class="nt">traces</span><span class="p">:</span>
+<a href="#__codelineno-0-14" id="__codelineno-0-14" name="__codelineno-0-14"></a><span class="w">      </span><span class="nt">exporters</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">otlphttp/dynatrace</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">spanmetrics</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># feed the connector too</span>
+<a href="#__codelineno-0-15" id="__codelineno-0-15" name="__codelineno-0-15"></a><span class="w">    </span><span class="nt">metrics/spanmetrics</span><span class="p">:</span>
+<a href="#__codelineno-0-16" id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="w">      </span><span class="nt">receivers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">spanmetrics</span><span class="p p-Indicator">]</span>
+<a href="#__codelineno-0-17" id="__codelineno-0-17" name="__codelineno-0-17"></a><span class="w">      </span><span class="nt">processors</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">memory_limiter</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">batch</span><span class="p p-Indicator">]</span><span class="w">            </span><span class="c1"># invariants hold here</span>
+<a href="#__codelineno-0-18" id="__codelineno-0-18" name="__codelineno-0-18"></a><span class="w">      </span><span class="nt">exporters</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">otlphttp/dynatrace</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>RED maps to: <code>casino.red.calls</code> (rate), the same metric split by
+<code>status.code</code> (errors), and <code>casino.red.duration</code> (duration histogram). Keep the
+dimensions <strong>bounded</strong> — <code>span.name</code>, <code>status.code</code>, and the two casino dims —
+never <code>player.id</code>/<code>round.id</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Delta temporality</p>
+<p>The baseline metrics pipeline converts counters to delta via
+<code>cumulativetodelta</code>, but connector output does <strong>not</strong> pass through it. Set
+<code>aggregation_temporality: AGGREGATION_TEMPORALITY_DELTA</code> on the connector so
+<code>casino.red.*</code> follows the tenant's delta convention instead of shipping
+cumulative.</p>
+</div>
+<h2 id="3-drive-opencode-the-prompt-ladder">③ Drive opencode — the prompt ladder</h2>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio"/><input id="__tabbed_1_2" name="__tabbed_1" type="radio"/><input id="__tabbed_1_3" name="__tabbed_1" type="radio"/><input id="__tabbed_1_4" name="__tabbed_1" type="radio"/><div class="tabbed-labels"><label for="__tabbed_1_1">P1 · Orient (read-only)</label><label for="__tabbed_1_2">P2 · Core — add the connector</label><label for="__tabbed_1_3">P3 · Deepen — dimensions + buckets</label><label for="__tabbed_1_4">P4 · Steer — verify the wiring</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p><div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>Using the otel-collector skill, read observability/collectors/gateway.yaml —
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a>do not edit. List the current pipelines and their exporters, and tell me
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a>where a spanmetrics connector would attach to derive RED metrics from spans.
+</code></pre></div>
+<strong>What you should see:</strong> the agent maps the traces pipeline and names the
+connector attach points (traces exporter + new metrics receiver).
+<strong>Review check:</strong> it does not propose any application-code change.</p>
+</div>
+<div class="tabbed-block">
+<p><div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>Add a spanmetrics connector under a connectors: block with namespace
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>casino.red and a duration histogram. Wire it as an exporter on the traces
+<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a>pipeline and as the receiver of a new metrics/spanmetrics pipeline that
+<a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a>exports to Dynatrace.
+</code></pre></div>
+<strong>What you should see:</strong> a <code>connectors:</code> block plus the two pipeline edits.
+<strong>Review check:</strong> the new metrics pipeline keeps <code>memory_limiter</code> first and
+<code>batch</code> last.</p>
+</div>
+<div class="tabbed-block">
+<p><div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>Add dimensions casino.game.name and casino.outcome to the connector, and set
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a>explicit histogram buckets from 1ms to 5s. Do NOT add player.id or round.id.
+</code></pre></div>
+<strong>What you should see:</strong> bounded <code>dimensions:</code> and an <code>explicit.buckets</code> list.
+<strong>Review check:</strong> no unbounded per-player/per-round dimension slipped in.</p>
+</div>
+<div class="tabbed-block">
+<p><div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>Confirm the connector is both an exporter (traces) and a receiver
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a>(metrics/spanmetrics), and that the invariants hold on every pipeline:
+<a href="#__codelineno-4-3" id="__codelineno-4-3" name="__codelineno-4-3"></a>memory_limiter first, batch last.
+</code></pre></div>
+<strong>What you should see:</strong> the agent re-reads the service block and confirms both
+attachments and the invariant order.
+<strong>Review check:</strong> the traces pipeline still exports to Dynatrace <em>and</em>
+spanmetrics — not one or the other.</p>
+</div>
+</div>
+</div>
+<h2 id="4-review-apply">④ Review &amp; apply</h2>
+<p>Diff against the reference, then apply the collector:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>observability/collectors/gateway.yaml
+<a href="#__codelineno-5-2" id="__codelineno-5-2" name="__codelineno-5-2"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>observability<span class="w"> </span>rollout<span class="w"> </span>status<span class="w"> </span>deploy/otel-gateway-collector
+</code></pre></div>
+<p>Drive some load (the k6 loadgen is already running) so spans flow through the
+connector.</p>
+<h2 id="verify">Verify</h2>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a>// R + E — call rate per operation, with error isolation
+<a href="#__codelineno-6-2" id="__codelineno-6-2" name="__codelineno-6-2"></a>timeseries calls = sum(casino.red.calls), by: { span.name, status.code }, from: now() - 1h
+<a href="#__codelineno-6-3" id="__codelineno-6-3" name="__codelineno-6-3"></a>
+<a href="#__codelineno-6-4" id="__codelineno-6-4" name="__codelineno-6-4"></a>// D — p90 request duration per operation
+<a href="#__codelineno-6-5" id="__codelineno-6-5" name="__codelineno-6-5"></a>timeseries d_p90 = percentile(casino.red.duration, 90), by: { span.name }, from: now() - 1h
+</code></pre></div>
+<ul>
+<li><strong>Before:</strong> <code>casino.red.*</code> does not exist — both queries return nothing.</li>
+<li><strong>After:</strong> <code>casino.red.calls</code> returns a series per <code>span.name</code> (× <code>status.code</code>,
+  so errors are isolated), and <code>casino.red.duration</code> returns a p90 per operation —
+  a full RED view, built entirely at the collector.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">If the agent gets it wrong — steer it back</p>
+<ul>
+<li><strong>Puts spanmetrics on the metrics receiver side only:</strong> <em>"spanmetrics is a
+  connector — it must be an exporter on the traces pipeline AND the receiver of
+  the new metrics pipeline."</em></li>
+<li><strong>Drops the Dynatrace exporter from traces:</strong> <em>"the traces pipeline must keep
+  exporting to Dynatrace as well as feeding spanmetrics."</em></li>
+<li><strong>Adds unbounded dimensions:</strong> <em>"only span.name, status.code, casino.game.name
+  and casino.outcome — no player.id or round.id."</em></li>
+<li><strong>Breaks the invariant:</strong> <em>"memory_limiter must be first and batch last on the
+  new metrics/spanmetrics pipeline."</em></li>
+</ul>
+</div>
+<h2 id="definition-of-done">Definition of done</h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> <code>spanmetrics</code> connector added with <code>namespace: casino.red</code> and a duration histogram</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> Wired as traces exporter + <code>metrics/spanmetrics</code> pipeline receiver</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> Invariants hold on every pipeline (memory_limiter first, batch last)</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> <code>casino.red.calls</code> and <code>casino.red.duration</code> return data in Grail</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> No casino application code changed</li>
+</ul>
+<p>Back to the <a href="../catalog/">catalog menu</a>.</p>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<nav aria-label="Footer" class="md-footer__inner md-grid">
+<a aria-label="Previous: A3 — Multi-language instrumentation [25m][med]" class="md-footer__link md-footer__link--prev" href="../catalog-a3-multi-language/">
+<div class="md-footer__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</div>
+<div class="md-footer__title">
+<span class="md-footer__direction">
+                Previous
+              </span>
+<div class="md-ellipsis">
+                A3 — Multi-language instrumentation [25m][med]
+              </div>
+</div>
+</a>
+<a aria-label="Next: B3 — Drop noise (filter) [15m][easy]" class="md-footer__link md-footer__link--next" href="../catalog-b3-filter-drop-noise/">
+<div class="md-footer__title">
+<span class="md-footer__direction">
+                Next
+              </span>
+<div class="md-ellipsis">
+                B3 — Drop noise (filter) [15m][easy]
+              </div>
+</div>
+<div class="md-footer__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"></path></svg>
+</div>
+</a>
+</nav>
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.top", "navigation.tracking", "navigation.footer", "search.suggest", "search.highlight", "content.code.annotate", "content.code.copy", "content.tooltips"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+mermaid.initialize({
+    theme: (window.matchMedia && JSON.parse(window.localStorage.getItem("__palette") || "{}")?.color?.scheme === "slate") ? "dark" : "default"
+});</script></body>
+</html>

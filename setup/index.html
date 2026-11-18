@@ -1,0 +1,1893 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Attendee lab walkthrough for the 3h Dynatrace Perform hands-on OpenTelemetry training on the Vegas Casino">
+      
+      
+        <meta name="author" content="Henrik Rexed / IsItObservable">
+      
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../module-1/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>M0 — Environment Setup - Beyond the Honeymoon — OTel in Practice</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="cyan">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#m0-environment-setup" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Beyond the Honeymoon — OTel in Practice" class="md-header__button md-logo" aria-label="Beyond the Honeymoon — OTel in Practice" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Beyond the Honeymoon — OTel in Practice
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              M0 — Environment Setup
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="cyan"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="cyan"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Welcome
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  M0 — Environment Setup
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../module-1/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  M1 — Tour the broken casino
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../module-2/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  M2 — SDK configuration by file
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../module-3/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  M3 — The collector as control point
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../module-4/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  M4 — Sampling: cost/fidelity strategy
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../module-5/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  M5 — Operating at scale
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../troubleshooting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../advanced/getting-started/" class="md-tabs__link">
+          
+  
+  
+  Advanced self-paced track
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Beyond the Honeymoon — OTel in Practice" class="md-nav__button md-logo" aria-label="Beyond the Honeymoon — OTel in Practice" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Beyond the Honeymoon — OTel in Practice
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Welcome
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    M0 — Environment Setup
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    M0 — Environment Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-start-the-codespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Start the Codespace
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment variables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-verify-the-kind-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Verify the kind cluster
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-connect-to-the-dynatrace-tenant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Connect to the Dynatrace tenant
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-open-the-gitops-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Open the GitOps loop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-play-the-casino" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Play the casino
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-verify-the-telemetry-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Verify the telemetry path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done-m0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done — M0
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../module-1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    M1 — Tour the broken casino
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../module-2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    M2 — SDK configuration by file
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../module-3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    M3 — The collector as control point
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../module-4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    M4 — Sampling: cost/fidelity strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../module-5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    M5 — Operating at scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced self-paced track
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced self-paced track
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/step-0-warmup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step 0 — Warmup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/step-1-instrument-with-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step 1 — Instrument with AI agents
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/step-2-business-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step 2 — Business metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/step-3-weaver-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step 3 — Weaver pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/step-4-cost-of-observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step 4 — Cost of observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/step-5-high-cardinality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step 5 — High-cardinality metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/step-6-pii-logs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step 6 — PII in logs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/step-7-tail-sampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step 7 — Tail sampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_9_11" id="__nav_9_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catalog (extra exercises)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Catalog (extra exercises)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/catalog-a1-broken-trace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A1 — Fix a broken trace [25m][med]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/catalog-a2-log-trace-correlation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A2 — Log ↔ trace correlation [20m][med]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/catalog-a3-multi-language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A3 — Multi-language instrumentation [25m][med]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/catalog-b1-spanmetrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    B1 — RED metrics from spans [20m][med]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/catalog-b3-filter-drop-noise/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    B3 — Drop noise (filter) [15m][easy]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced/catalog-c1-dtctl-dashboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C1 — Dashboard via dtctl [20m][med]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-start-the-codespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Start the Codespace
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment variables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-verify-the-kind-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Verify the kind cluster
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-connect-to-the-dynatrace-tenant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Connect to the Dynatrace tenant
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-open-the-gitops-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Open the GitOps loop
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-play-the-casino" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Play the casino
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-verify-the-telemetry-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Verify the telemetry path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done-m0" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done — M0
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="m0-environment-setup">M0 — Environment Setup</h1>
+<p><strong>Goal:</strong> Codespace up, cluster healthy, Dynatrace connected, casino deployed,
+and you can play the casino. Budget 15 minutes; helpers circulate.</p>
+<h2 id="1-start-the-codespace">1. Start the Codespace</h2>
+<ol>
+<li>Open the training repository you received in your welcome email.</li>
+<li>Click <strong>Code → Codespaces → Create codespace on main</strong>.</li>
+<li>Wait for post-create setup to finish — the terminal shows the kind cluster
+   being created. Typically 3–5 minutes with a prebuild.</li>
+</ol>
+<p>Your Codespace secrets were injected by the organizers. Check they are present:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>env<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">'DT_TENANT|DT_OPERATOR_TOKEN|DT_INGEST_TOKEN|PARTICIPANT_ID'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="o">=</span><span class="w"> </span>-f1
+</code></pre></div>
+<p>Expected output: the four variable <strong>names</strong> (values stay hidden in lists):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>DT_TENANT
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>DT_OPERATOR_TOKEN
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>DT_INGEST_TOKEN
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>PARTICIPANT_ID
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Renamed from <code>DT_API_TOKEN</code></p>
+<p>The operator token is now <code>DT_OPERATOR_TOKEN</code>. If your Codespace secret is
+still named <code>DT_API_TOKEN</code>, bring-up continues (the installer accepts it as a
+deprecated fallback) — but rename the secret when you can. See the full
+contract in <a href="#environment-variables">Environment variables</a> below.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Your <code>PARTICIPANT_ID</code> is your identity</p>
+<p>Everyone shares one Dynatrace tenant. <code>PARTICIPANT_ID</code> is the one value you
+set to be unique: it names your kind cluster and becomes <code>k8s.cluster.name</code>
+on every piece of telemetry you send. Keep it DNS-label-safe (lowercase
+letters, digits, <code>-</code> — no spaces or uppercase). <strong>Always filter Dynatrace by
+your cluster name</strong> — that is how you see your casino and not your
+neighbor's. (Advanced: <code>KIND_CLUSTER_NAME</code> overrides it if you ever need to
+name the cluster directly; most attendees never set it.)</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Advanced track only: check <code>opencode</code> works</p>
+<p>The <a href="../advanced/getting-started/">advanced self-paced track</a> drives the
+<code>opencode</code> AI coding agent, wired at start-up to a facilitator-hosted LLM
+proxy. If you are on that track and set the two <code>WORKSHOP_*</code> secrets, confirm
+the agent and its proxy credential are in place:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>opencode<span class="w"> </span>--version<span class="w">                 </span><span class="c1"># the CLI is baked into the image</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">test</span><span class="w"> </span>-f<span class="w"> </span>.workshop-llm.env<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"proxy credential minted"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"no proxy credential — re-run: bash .devcontainer/bootstrap/dispense-llm.sh"</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>opencode<span class="w"> </span>run<span class="w"> </span><span class="s2">"reply with the word READY"</span><span class="w">   </span><span class="c1"># should return a model completion</span>
+</code></pre></div>
+<p>No <code>.workshop-llm.env</code>? Post-create setup skipped the dispense because the
+<code>WORKSHOP_*</code> secrets were absent, or the dispenser was unreachable — see
+<a href="../troubleshooting/#workshop-llm-proxy-opencode">Troubleshooting</a>. The M0–M5
+modules do <strong>not</strong> need <code>opencode</code>, so you can ignore this on the main track.</p>
+</div>
+<h2 id="environment-variables">Environment variables</h2>
+<p>This is the <strong>one canonical contract</strong> for every variable the training consumes.
+<code>.env.sample</code> and <code>.devcontainer/.env.example</code> mirror it — if anything disagrees,
+this table wins.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Type</th>
+<th>Consumed by</th>
+<th>Required?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DT_TENANT</code></td>
+<td>Tenant base URL (<code>https://&lt;id&gt;.live.dynatrace.com</code>)</td>
+<td>Operator (<code>&lt;DT_TENANT&gt;/api</code>) <strong>and</strong> OTel collectors (<code>&lt;DT_TENANT&gt;/api/v2/otlp</code>) — one URL, two uses</td>
+<td>Required for all Dynatrace labs</td>
+</tr>
+<tr>
+<td><code>DT_OPERATOR_TOKEN</code></td>
+<td><strong>Platform token</strong> (<code>dt0s16</code>), <code>fleet-management:*</code> + <code>settings:objects:*</code> scopes</td>
+<td>Dynatrace Operator → DynaKube <code>apiToken</code> (<code>deploy/dynatrace/install.sh</code>)</td>
+<td>Required for K8s monitoring (M4)</td>
+</tr>
+<tr>
+<td><code>DT_INGEST_TOKEN</code></td>
+<td><strong>Platform token</strong> (<code>dt0s16</code>), <code>openpipeline:{traces,metrics,logs,events}:ingest</code> + <code>storage:metrics:write</code></td>
+<td><strong>Two</strong> consumers: OTel collectors' OTLP exporter (<code>Bearer</code> header) <strong>and</strong> operator <code>dataIngestToken</code></td>
+<td>Required for telemetry export (M3/M5)</td>
+</tr>
+<tr>
+<td><code>DT_PLATFORM_TOKEN</code></td>
+<td>Platform token (<code>dt0s16</code>)</td>
+<td><code>dtctl</code> <strong>only</strong> — never the operator</td>
+<td>Optional (dtctl labs)</td>
+</tr>
+<tr>
+<td><code>DT_PLATFORM_URL</code></td>
+<td>Gen3 SaaS apps URL (<code>https://&lt;id&gt;.apps.dynatrace.com</code>)</td>
+<td><code>dtctl</code> on Gen3 SaaS</td>
+<td>Optional — derived from <code>DT_TENANT</code> when unset</td>
+</tr>
+<tr>
+<td><code>PARTICIPANT_ID</code></td>
+<td>DNS-label-safe id</td>
+<td>kind cluster name, <code>k8s.cluster.name</code>, DynaKube name</td>
+<td>Required (blank → <code>otel-training</code>, collides in a class)</td>
+</tr>
+<tr>
+<td><code>KIND_CLUSTER_NAME</code></td>
+<td>cluster name</td>
+<td>advanced override; wins over <code>PARTICIPANT_ID</code></td>
+<td>Optional</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">The three <code>DT_*</code> tokens are all platform tokens but <strong>not</strong> interchangeable</p>
+<p>On this Gen3 tenant <code>DT_OPERATOR_TOKEN</code>, <code>DT_INGEST_TOKEN</code>, and
+<code>DT_PLATFORM_TOKEN</code> are all <strong>platform tokens</strong> (<code>dt0s16</code>) — but each carries a
+<strong>different scope set</strong> and is minted separately: the operator token needs
+<code>fleet-management:*</code> + <code>settings:objects:*</code>, the ingest token needs
+<code>openpipeline:*:ingest</code> + <code>storage:metrics:write</code>, and <code>DT_PLATFORM_TOKEN</code> is
+used only by <code>dtctl</code>. Minting one where another is expected will fail auth.
+The old single <code>DT_API_TOKEN</code> is a deprecated alias for <code>DT_OPERATOR_TOKEN</code>
+only. (The Dynatrace <strong>Operator ≥ 1.10.0</strong> is what accepts platform tokens in
+the <code>apiToken</code>/<code>dataIngestToken</code> Secret keys; <code>install.sh</code> pins <code>1.11.1</code>.)</p>
+</div>
+<p>Two variables below are <strong>not</strong> Dynatrace tokens — they belong to the advanced
+track's <code>opencode</code> LLM dispenser (unrelated to the DT tenant):</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Type</th>
+<th>Consumed by</th>
+<th>Required?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WORKSHOP_DISPENSER_URL</code></td>
+<td>URL</td>
+<td><code>dispense-llm.sh</code> → <code>opencode</code> LLM proxy key</td>
+<td>Optional (advanced Step 1 only)</td>
+</tr>
+<tr>
+<td><code>WORKSHOP_ROOM_PASSWORD</code></td>
+<td>shared secret (<code>X-Room-Password</code>)</td>
+<td><code>dispense-llm.sh</code> → dispenser auth</td>
+<td>Optional (advanced Step 1 only)</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info">
+<p class="admonition-title">Davis CoPilot / OAuth (optional, not required)</p>
+<p>If your cohort runs the optional <strong>Davis CoPilot</strong> exercise it uses a separate
+Dynatrace <strong>OAuth client</strong> (<code>dt0s02</code>), configured in its own
+<a href="../advanced/getting-started/">advanced section</a> — it is deliberately kept out
+of the required token set above. Most attendees do not need it.</p>
+</div>
+<h2 id="2-verify-the-kind-cluster">2. Verify the kind cluster</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>nodes
+</code></pre></div>
+<p>Expected: one node named <code>&lt;PARTICIPANT_ID&gt;-control-plane</code>, status <code>Ready</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-A
+</code></pre></div>
+<p>Expected: pods <code>Running</code> (or <code>Completed</code> for Jobs) in:</p>
+<table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>What lives there</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>casino</code></td>
+<td>the Vegas Casino services, Redis, PostgreSQL, k6 load-gen</td>
+</tr>
+<tr>
+<td><code>observability</code></td>
+<td><code>otel-gateway-*</code> (gateway collector) and <code>otel-logs-*</code> (DaemonSet)</td>
+</tr>
+<tr>
+<td><code>dynatrace</code></td>
+<td>Dynatrace Operator + <code>&lt;name&gt;-activegate-0</code></td>
+</tr>
+<tr>
+<td><code>gitea</code></td>
+<td>your in-cluster Git host</td>
+</tr>
+<tr>
+<td><code>argocd</code></td>
+<td>Argo CD</td>
+</tr>
+</tbody>
+</table>
+<p>If pods are missing, run the bootstrap (idempotent) and ask a helper if it
+does not converge:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>bash<span class="w"> </span>gitops/bootstrap/bootstrap-gitops.sh
+</code></pre></div>
+<h2 id="3-connect-to-the-dynatrace-tenant">3. Connect to the Dynatrace tenant</h2>
+<ol>
+<li>
+<p>Get your tenant URL and open it in a browser tab:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">echo</span><span class="w"> </span><span class="nv">$DT_TENANT</span>
+</code></pre></div>
+</li>
+<li>
+<p>Sign in with the credentials from your handout.</p>
+</li>
+<li>Go to <strong>Infrastructure → Kubernetes</strong> and confirm a cluster named after your
+   <code>PARTICIPANT_ID</code> appears (first appearance can take a few minutes).</li>
+<li>Open <strong>Distributed traces</strong>. You should see a trickle of traces from the
+   casino already — the k6 load generator is playing the casino for you. The
+   traces will look <em>broken</em>. That is intentional; it is Module 1's job.</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Filter by your cluster</p>
+<p>In most Dynatrace views you can add a filter <code>k8s.cluster.name</code> =
+your <code>PARTICIPANT_ID</code>. Set it once, save the view — you will use it all
+day.</p>
+</div>
+<h2 id="4-open-the-gitops-loop">4. Open the GitOps loop</h2>
+<p>Your lab mechanic for the whole session: <strong>edit a manifest → commit → Argo CD
+deploys it</strong>. No <code>kubectl apply</code> into the <code>casino</code> namespace (Argo CD's
+self-heal would revert it anyway).</p>
+<p>All three UIs are forwarded to your codespace and appear, labelled, in the
+<strong>Ports</strong> panel (<code>Casino app</code> → 30000, <code>Git host</code> → 30001, <code>Argo CD UI</code> → 30002):</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>URL</th>
+<th>Credentials</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Casino app</td>
+<td>http://localhost:30000</td>
+<td>register a player in the UI</td>
+</tr>
+<tr>
+<td>Gitea (your Git host)</td>
+<td>http://localhost:30001</td>
+<td><code>attendee</code> / <code>trainingpass123</code></td>
+</tr>
+<tr>
+<td>Argo CD</td>
+<td>http://localhost:30002</td>
+<td><code>admin</code> / password printed at bootstrap</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Using the external GitLab fork?</strong> When the GitOps bootstrap runs with
+<code>GITOPS_PROVIDER=gitlab</code>, the git host is <strong>not</strong> the in-cluster Gitea on
+30001 — open your GitLab fork's web URL instead (printed in the GitOps
+bootstrap banner). Ports 30000 (casino) and 30002 (Argo CD) are unchanged.</p>
+</blockquote>
+<ol>
+<li>Open Gitea at http://localhost:30001 and sign in.</li>
+<li>Find the repo <code>casino/casino</code> — it contains the Kubernetes manifests for
+   the <code>casino</code> namespace. This is where you will fix defects.</li>
+<li>Open Argo CD at http://localhost:30002 — the <code>casino</code> Application shows
+   <code>Healthy</code> / <code>Synced</code>.</li>
+</ol>
+<h2 id="5-play-the-casino">5. Play the casino</h2>
+<p>The casino frontend (<code>vegas-casino-frontend</code>) is exposed through the Gateway API
+data plane on <strong>NodePort 30000</strong> — no <code>kubectl port-forward</code> needed. In the
+Codespaces <strong>Ports</strong> panel it shows up labelled <strong>Casino app</strong>; click the globe
+icon on port <strong>30000</strong> (or open <strong>http://localhost:30000</strong>).</p>
+<p>Open http://localhost:30000, register a player account, and play a few rounds —
+try the slots and another game. Any game works; the point is generating
+telemetry.</p>
+<blockquote>
+<p>30000 is published by the kind control-plane node and forwarded to the
+codespace, the same way the Gitea (30001) and Argo CD (30002) UIs are.</p>
+</blockquote>
+<p>Leave the casino open in a browser tab and use a terminal (+ icon) for
+everything else.</p>
+<p>Sanity-check the entry point from inside the cluster:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>casino<span class="w"> </span>run<span class="w"> </span>curl-check<span class="w"> </span>--rm<span class="w"> </span>-i<span class="w"> </span>--restart<span class="o">=</span>Never<span class="w"> </span>--image<span class="o">=</span>curlimages/curl:8.10.1<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>curl<span class="w"> </span>-fsS<span class="w"> </span>http://vegas-casino-frontend:3000/health
+</code></pre></div>
+<p>Expected: a health response from the frontend.</p>
+<h2 id="6-verify-the-telemetry-path">6. Verify the telemetry path</h2>
+<p>Every service exports OTLP to the gateway collector, which enriches and
+forwards to Dynatrace:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>observability<span class="w"> </span>get<span class="w"> </span>otelcol
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>observability<span class="w"> </span>logs<span class="w"> </span>deploy/otel-gateway-collector<span class="w"> </span>--tail<span class="o">=</span><span class="m">5</span>
+</code></pre></div>
+<p>Expected: <code>otel-gateway</code> and <code>otel-logs</code> both <code>Running</code>, no export errors in
+the gateway log.</p>
+<h2 id="definition-of-done-m0">Definition of done — M0</h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>kubectl get nodes</code> shows one Ready node</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> All pods Running in <code>casino</code>, <code>observability</code>, <code>dynatrace</code>, <code>gitea</code>, <code>argocd</code></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Your cluster appears under <strong>Infrastructure → Kubernetes</strong> in Dynatrace</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Gitea reachable at http://localhost:30001, repo <code>casino/casino</code> visible</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Casino UI reachable at http://localhost:30000 and you played a round</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>otel-gateway</code> log shows no export errors</li>
+</ul>
+<p>Stuck? Check the <a href="../troubleshooting/">Troubleshooting</a> page, or flag a helper.</p>
+<p>Next: <a href="../module-1/">M1 — Tour the broken casino</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: Welcome">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Welcome
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../module-1/" class="md-footer__link md-footer__link--next" aria-label="Next: M1 — Tour the broken casino">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                M1 — Tour the broken casino
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.top", "navigation.tracking", "navigation.footer", "search.suggest", "search.highlight", "content.code.annotate", "content.code.copy", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

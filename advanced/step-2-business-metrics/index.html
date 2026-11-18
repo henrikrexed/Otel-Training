@@ -1,0 +1,985 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Attendee lab walkthrough for the 3h Dynatrace Perform hands-on OpenTelemetry training on the Vegas Casino" name="description"/>
+<meta content="Henrik Rexed / IsItObservable" name="author"/>
+<link href="../step-1-instrument-with-agents/" rel="prev"/>
+<link href="../step-3-weaver-pipeline/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>Step 2 — Business metrics - Beyond the Honeymoon — OTel in Practice</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="cyan" data-md-color-primary="deep-purple" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#step-2-business-metrics">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="Beyond the Honeymoon — OTel in Practice" class="md-header__button md-logo" data-md-component="logo" href="../.." title="Beyond the Honeymoon — OTel in Practice">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            Beyond the Honeymoon — OTel in Practice
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Step 2 — Business metrics
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="cyan" data-md-color-media="" data-md-color-primary="deep-purple" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="cyan" data-md-color-media="" data-md-color-primary="deep-purple" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+<div class="md-search__suggest" data-md-component="search-suggest"></div>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Welcome
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../setup/">
+        
+  
+  
+    
+  
+  M0 — Environment Setup
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-1/">
+        
+  
+  
+    
+  
+  M1 — Tour the broken casino
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-2/">
+        
+  
+  
+    
+  
+  M2 — SDK configuration by file
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-3/">
+        
+  
+  
+    
+  
+  M3 — The collector as control point
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-4/">
+        
+  
+  
+    
+  
+  M4 — Sampling: cost/fidelity strategy
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../module-5/">
+        
+  
+  
+    
+  
+  M5 — Operating at scale
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../troubleshooting/">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../getting-started/">
+          
+  
+  
+  Advanced self-paced track
+
+        </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="Beyond the Honeymoon — OTel in Practice" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="Beyond the Honeymoon — OTel in Practice">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    Beyond the Honeymoon — OTel in Practice
+  </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Welcome
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../setup/">
+<span class="md-ellipsis">
+    
+  
+    M0 — Environment Setup
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-1/">
+<span class="md-ellipsis">
+    
+  
+    M1 — Tour the broken casino
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-2/">
+<span class="md-ellipsis">
+    
+  
+    M2 — SDK configuration by file
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-3/">
+<span class="md-ellipsis">
+    
+  
+    M3 — The collector as control point
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-4/">
+<span class="md-ellipsis">
+    
+  
+    M4 — Sampling: cost/fidelity strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../module-5/">
+<span class="md-ellipsis">
+    
+  
+    M5 — Operating at scale
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../troubleshooting/">
+<span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Advanced self-paced track
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced self-paced track
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../getting-started/">
+<span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../environment/">
+<span class="md-ellipsis">
+    
+  
+    The environment
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-0-warmup/">
+<span class="md-ellipsis">
+    
+  
+    Step 0 — Warmup
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-1-instrument-with-agents/">
+<span class="md-ellipsis">
+    
+  
+    Step 1 — Instrument with AI agents
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Step 2 — Business metrics
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Step 2 — Business metrics
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-concept">
+<span class="md-ellipsis">
+      
+        The concept
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-problem-no-business-metrics-on-the-money-path">
+<span class="md-ellipsis">
+      
+        ① Problem — no business metrics on the money-path
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-opencode-add-the-counter-and-histogram">
+<span class="md-ellipsis">
+      
+        ② Opencode — add the counter and histogram
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-review-read-the-diff">
+<span class="md-ellipsis">
+      
+        ③ Review — read the diff
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#4-apply-commit-argo-cd-sync">
+<span class="md-ellipsis">
+      
+        ④ Apply — commit → Argo CD sync
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#dynatrace-validation-checkpoint">
+<span class="md-ellipsis">
+      
+        Dynatrace validation checkpoint
+      
+    </span>
+</a>
+<nav aria-label="Dynatrace validation checkpoint" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#build-a-dql-tile">
+<span class="md-ellipsis">
+      
+        Build a DQL tile
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#definition-of-done">
+<span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-3-weaver-pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Step 3 — Weaver pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-4-cost-of-observability/">
+<span class="md-ellipsis">
+    
+  
+    Step 4 — Cost of observability
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-5-high-cardinality/">
+<span class="md-ellipsis">
+    
+  
+    Step 5 — High-cardinality metrics
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-6-pii-logs/">
+<span class="md-ellipsis">
+    
+  
+    Step 6 — PII in logs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../step-7-tail-sampling/">
+<span class="md-ellipsis">
+    
+  
+    Step 7 — Tail sampling
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_9_11" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9_11" id="__nav_9_11_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Catalog (extra exercises)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_9_11">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Catalog (extra exercises)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-a1-broken-trace/">
+<span class="md-ellipsis">
+    
+  
+    A1 — Fix a broken trace [25m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-a2-log-trace-correlation/">
+<span class="md-ellipsis">
+    
+  
+    A2 — Log ↔ trace correlation [20m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-a3-multi-language/">
+<span class="md-ellipsis">
+    
+  
+    A3 — Multi-language instrumentation [25m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-b1-spanmetrics/">
+<span class="md-ellipsis">
+    
+  
+    B1 — RED metrics from spans [20m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-b3-filter-drop-noise/">
+<span class="md-ellipsis">
+    
+  
+    B3 — Drop noise (filter) [15m][easy]
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../catalog-c1-dtctl-dashboard/">
+<span class="md-ellipsis">
+    
+  
+    C1 — Dashboard via dtctl [20m][med]
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-concept">
+<span class="md-ellipsis">
+      
+        The concept
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-problem-no-business-metrics-on-the-money-path">
+<span class="md-ellipsis">
+      
+        ① Problem — no business metrics on the money-path
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-opencode-add-the-counter-and-histogram">
+<span class="md-ellipsis">
+      
+        ② Opencode — add the counter and histogram
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-review-read-the-diff">
+<span class="md-ellipsis">
+      
+        ③ Review — read the diff
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#4-apply-commit-argo-cd-sync">
+<span class="md-ellipsis">
+      
+        ④ Apply — commit → Argo CD sync
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#dynatrace-validation-checkpoint">
+<span class="md-ellipsis">
+      
+        Dynatrace validation checkpoint
+      
+    </span>
+</a>
+<nav aria-label="Dynatrace validation checkpoint" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#build-a-dql-tile">
+<span class="md-ellipsis">
+      
+        Build a DQL tile
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#definition-of-done">
+<span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="step-2-business-metrics">Step 2 — Business metrics</h1>
+<p><strong>Goal:</strong> turn the money-path you instrumented in Step 1 into <strong>business
+metrics</strong> you can chart and alert on. Traces answer "what happened on this one
+spin"; metrics answer "how many bets, and how much wagered, by game and outcome,
+over time". You will run the <strong>Problem → Opencode → Verify</strong> loop again — this
+time adding a counter (<code>casino.bets.count</code>) and a histogram
+(<code>casino.wager.amount</code>) to the slots service with the <code>otel-instrumentation</code>
+skill — then build a DQL tile. Budget 25 minutes.</p>
+<h2 id="the-concept">The concept</h2>
+<div class="mermaid">flowchart TB
+  subgraph before["Before — traces only"]
+    b1["casino.slots.spin span"] --&gt; b2["per-spin detail<br/>but no aggregate volume/value"]
+  end
+  subgraph after["After — business metrics added"]
+    a1["casino.bets.count (counter)"] --&gt; a2["bets per game × outcome"]
+    a3["casino.wager.amount (histogram)"] --&gt; a4["wager distribution:<br/>p50 / p90 / max by game"]
+  end
+</div>
+<p>A span is a per-event record — great for "show me this trace", expensive to
+aggregate over millions of rows. A <strong>metric</strong> is pre-aggregated and cheap to
+query over long windows, so it is what a dashboard or SLO reads. The casino
+money-path has rich spans after Step 1 but <strong>no first-class business metrics</strong>:
+there is no cheap way to chart "bets per minute on slots" or "wager-size
+distribution by outcome". You add two instruments:</p>
+<table>
+<thead>
+<tr>
+<th>Instrument</th>
+<th>Name</th>
+<th>Why this type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Counter</td>
+<td><code>casino.bets.count</code></td>
+<td>Monotonic event count — bets placed, by game and outcome. Rolls up to a rate.</td>
+</tr>
+<tr>
+<td>Histogram</td>
+<td><code>casino.wager.amount</code></td>
+<td>A <strong>distribution</strong> — you want p50/p90/max wager, not just a sum, so a histogram (not a counter) is the right instrument.</td>
+</tr>
+</tbody>
+</table>
+<p>Both carry the <strong>same dimensions as the Step 1 span</strong> — <code>casino.game.name</code> and
+<code>casino.outcome</code> — so the metric and the trace share one vocabulary (and the
+<a href="../step-3-weaver-pipeline/">Step 3 Weaver registry</a> can guard both).</p>
+<div class="admonition note">
+<p class="admonition-title">Bounded dimensions only — on purpose</p>
+<p>Dimension the metrics <strong>only</strong> by <code>casino.game.name</code> (4 values) and
+<code>casino.outcome</code> (3 values) — never by <code>player.id</code> or <code>round.id</code>. That is the
+same cardinality discipline you enforce at the gateway in
+<a href="../step-5-high-cardinality/">Step 5</a>; here you simply never emit the
+unbounded labels in the first place.</p>
+</div>
+<h2 id="1-problem-no-business-metrics-on-the-money-path">① Problem — no business metrics on the money-path</h2>
+<p>After Step 1 the slots service emits a <code>casino.slots.spin</code> span per request, but
+the <code>/spin</code> handler <strong>never records a metric</strong>. Reference asset (the planted
+state): <code>labs/advanced/step-business-metrics/before.slots-metrics.js</code>.</p>
+<p>Confirm the symptom — run the <a href="#dynatrace-validation-checkpoint">checkpoint DQL</a>
+for <code>casino.bets.count</code> now and watch it return <strong>no such metric</strong>. That is your
+"before": you can pull individual spins, but you cannot cheaply chart bet volume
+or wager distribution.</p>
+<h2 id="2-opencode-add-the-counter-and-histogram">② Opencode — add the counter and histogram</h2>
+<p>Drive <code>opencode</code> at the slots service with the <code>otel-instrumentation</code> skill. The
+prompt names the <strong>goal</strong>, the <strong>target file</strong>, and the <strong>skill</strong>:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>opencode<span class="w"> </span>run<span class="w"> </span><span class="s2">"Using the otel-instrumentation skill: in the vegas-slots-service \</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="s2">/spin handler, add OpenTelemetry metrics via @opentelemetry/api metrics. Create \</span>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="s2">a Counter 'casino.bets.count' and a Histogram 'casino.wager.amount' (unit chips) \</span>
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a><span class="s2">from a meter 'casino-slots'. On each settled spin, add 1 to the counter and \</span>
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a><span class="s2">record the bet amount to the histogram, both with attributes casino.game.name \</span>
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a><span class="s2">and casino.outcome — matching the Step 1 span. Do NOT add player.id or round.id. \</span>
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a><span class="s2">Keep the existing span and response shape."</span>
+</code></pre></div>
+<h2 id="3-review-read-the-diff">③ Review — read the diff</h2>
+<p>Read the diff before committing. The target shape (from
+<code>labs/advanced/step-business-metrics/after.slots-metrics.js</code>):</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="gi">+ const { metrics } = require('@opentelemetry/api');</span>
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a><span class="gi">+ const meter = metrics.getMeter('casino-slots', '1.0.0');</span>
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="gi">+ const betsCount = meter.createCounter('casino.bets.count', {</span>
+<a href="#__codelineno-1-4" id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="gi">+   description: 'Number of bets placed', unit: '{bet}',</span>
+<a href="#__codelineno-1-5" id="__codelineno-1-5" name="__codelineno-1-5"></a><span class="gi">+ });</span>
+<a href="#__codelineno-1-6" id="__codelineno-1-6" name="__codelineno-1-6"></a><span class="gi">+ const wagerAmount = meter.createHistogram('casino.wager.amount', {</span>
+<a href="#__codelineno-1-7" id="__codelineno-1-7" name="__codelineno-1-7"></a><span class="gi">+   description: 'Distribution of wagered amounts', unit: '{chip}',</span>
+<a href="#__codelineno-1-8" id="__codelineno-1-8" name="__codelineno-1-8"></a><span class="gi">+ });</span>
+<a href="#__codelineno-1-9" id="__codelineno-1-9" name="__codelineno-1-9"></a><span class="w"> </span> app.post('/spin', async (req, res) =&gt; {
+<a href="#__codelineno-1-10" id="__codelineno-1-10" name="__codelineno-1-10"></a><span class="w"> </span>   const bet = Number(req.body.bet);
+<a href="#__codelineno-1-11" id="__codelineno-1-11" name="__codelineno-1-11"></a><span class="w"> </span>   await tracer.startActiveSpan('casino.slots.spin', async (span) =&gt; {
+<a href="#__codelineno-1-12" id="__codelineno-1-12" name="__codelineno-1-12"></a><span class="w"> </span>     // ... existing span attributes from Step 1 ...
+<a href="#__codelineno-1-13" id="__codelineno-1-13" name="__codelineno-1-13"></a><span class="w"> </span>     const outcome = draw();
+<a href="#__codelineno-1-14" id="__codelineno-1-14" name="__codelineno-1-14"></a><span class="w"> </span>     const payout = settle(bet, outcome);
+<a href="#__codelineno-1-15" id="__codelineno-1-15" name="__codelineno-1-15"></a><span class="w"> </span>     span.setAttribute('casino.outcome', outcome.kind);
+<a href="#__codelineno-1-16" id="__codelineno-1-16" name="__codelineno-1-16"></a><span class="w"> </span>     span.setAttribute('casino.payout.amount', payout);
+<a href="#__codelineno-1-17" id="__codelineno-1-17" name="__codelineno-1-17"></a><span class="gi">+     const dims = { 'casino.game.name': 'slots', 'casino.outcome': outcome.kind };</span>
+<a href="#__codelineno-1-18" id="__codelineno-1-18" name="__codelineno-1-18"></a><span class="gi">+     betsCount.add(1, dims);</span>
+<a href="#__codelineno-1-19" id="__codelineno-1-19" name="__codelineno-1-19"></a><span class="gi">+     wagerAmount.record(bet, dims);</span>
+<a href="#__codelineno-1-20" id="__codelineno-1-20" name="__codelineno-1-20"></a><span class="w"> </span>     res.json({ outcome, payout });
+<a href="#__codelineno-1-21" id="__codelineno-1-21" name="__codelineno-1-21"></a><span class="w"> </span>     // ... existing error handling + span.end() ...
+<a href="#__codelineno-1-22" id="__codelineno-1-22" name="__codelineno-1-22"></a><span class="w"> </span>   });
+<a href="#__codelineno-1-23" id="__codelineno-1-23" name="__codelineno-1-23"></a><span class="w"> </span> });
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">If the agent gets it wrong — steer it back</p>
+<ul>
+<li><strong>Uses a counter for the wager</strong> (<code>casino.wager.amount</code> as a Counter):
+  <em>"wager.amount must be a Histogram — I want p50/p90, not a running sum."</em></li>
+<li><strong>Adds high-cardinality dims</strong> (<code>player.id</code>, <code>round.id</code>): <em>"only
+  casino.game.name and casino.outcome as dimensions — drop any per-player or
+  per-round label."</em></li>
+<li><strong>Creates a new meter per request</strong> (inside the handler): <em>"create the meter
+  and instruments once at module scope, not inside the /spin handler."</em></li>
+</ul>
+</div>
+<h2 id="4-apply-commit-argo-cd-sync">④ Apply — commit → Argo CD sync</h2>
+<p>Same GitOps apply as Step 1 — the slots service is in the casino namespace:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>git<span class="w"> </span>add<span class="w"> </span>.<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"feat(slots): add casino.bets.count + casino.wager.amount metrics"</span>
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>git<span class="w"> </span>push<span class="w">            </span><span class="c1"># to your fork's main</span>
+</code></pre></div>
+<p>Argo CD redeploys the service (hit <strong>Refresh</strong> at <code>http://localhost:30002</code> to
+force the sync); play a few rounds of slots so the instruments emit.</p>
+<h2 id="dynatrace-validation-checkpoint">Dynatrace validation checkpoint</h2>
+<p>Run in a Grail <strong>Notebook</strong> against the training tenant (filter to your cluster).</p>
+<p><strong>Bet volume by game and outcome</strong> (the counter, as a rate):</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>timeseries bets = sum(casino.bets.count), by: { casino.game.name, casino.outcome }, from: now() - 1h
+</code></pre></div>
+<p><strong>Wager-size distribution</strong> (the histogram — p50/p90/max):</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>timeseries wager_p90 = percentile(casino.wager.amount, 90), by: { casino.game.name }, from: now() - 1h
+</code></pre></div>
+<ul>
+<li><strong>Before:</strong> both metrics are <strong>absent</strong> — <code>casino.bets.count</code> /
+  <code>casino.wager.amount</code> do not exist; the queries return nothing.</li>
+<li><strong>After:</strong> <code>casino.bets.count</code> returns one series per <code>casino.game.name</code> ×
+  <code>casino.outcome</code> (≤ 12 series — bounded on purpose), and
+  <code>casino.wager.amount</code> returns a p90 wager per game.</li>
+</ul>
+<h3 id="build-a-dql-tile">Build a DQL tile</h3>
+<p>Pin the first query as a tile so you have a live "bets per minute by outcome"
+chart — this is the business view a casino operator would actually watch:</p>
+<ol>
+<li>In the Notebook, run the <code>casino.bets.count</code> query above.</li>
+<li>Switch the visualization to a <strong>line chart</strong>, split by <code>casino.outcome</code>.</li>
+<li><strong>Add to dashboard</strong> → a dashboard named after your <code>PARTICIPANT_ID</code>.</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Why a histogram for wager, a counter for bets</p>
+<p>A counter answers <em>how many</em> (and its rate). A histogram answers <em>what
+distribution</em> — the p90 wager is what tells you whether a few whales or many
+small bets drive volume. Picking the instrument type to match the question is
+the core skill here; the agent will follow whichever you specify, so specify
+deliberately.</p>
+</div>
+<h2 id="definition-of-done">Definition of done</h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> <code>casino.bets.count</code> counter and <code>casino.wager.amount</code> histogram emitted from the slots service</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> Both carry <strong>only</strong> <code>casino.game.name</code> + <code>casino.outcome</code> (no player/round id)</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> The counter DQL returns ≤ 12 bounded series</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> The histogram DQL returns a p90 wager per game</li>
+<li class="task-list-item"><label class="task-list-control"><input disabled="" type="checkbox"/><span class="task-list-indicator"></span></label> A "bets by outcome" tile is pinned to your dashboard</li>
+</ul>
+<p>Next: <a href="../step-3-weaver-pipeline/">Step 3 — Weaver pipeline</a>.</p>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<nav aria-label="Footer" class="md-footer__inner md-grid">
+<a aria-label="Previous: Step 1 — Instrument with AI agents" class="md-footer__link md-footer__link--prev" href="../step-1-instrument-with-agents/">
+<div class="md-footer__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</div>
+<div class="md-footer__title">
+<span class="md-footer__direction">
+                Previous
+              </span>
+<div class="md-ellipsis">
+                Step 1 — Instrument with AI agents
+              </div>
+</div>
+</a>
+<a aria-label="Next: Step 3 — Weaver pipeline" class="md-footer__link md-footer__link--next" href="../step-3-weaver-pipeline/">
+<div class="md-footer__title">
+<span class="md-footer__direction">
+                Next
+              </span>
+<div class="md-ellipsis">
+                Step 3 — Weaver pipeline
+              </div>
+</div>
+<div class="md-footer__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"></path></svg>
+</div>
+</a>
+</nav>
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.top", "navigation.tracking", "navigation.footer", "search.suggest", "search.highlight", "content.code.annotate", "content.code.copy", "content.tooltips"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+mermaid.initialize({
+    theme: (window.matchMedia && JSON.parse(window.localStorage.getItem("__palette") || "{}")?.color?.scheme === "slate") ? "dark" : "default"
+});</script></body>
+</html>
