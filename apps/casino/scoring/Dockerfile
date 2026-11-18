@@ -24,9 +24,11 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends wget && \
     rm -rf /var/lib/apt/lists/*
 
-# Create non-root user (Debian-style tools, not Alpine busybox)
-RUN groupadd -g 1000 appuser && \
-    useradd -u 1000 -g appuser -m -s /usr/sbin/nologin appuser && \
+# Create non-root user (Debian-style tools, not Alpine busybox). Let the system
+# assign the uid/gid — the base image already ships a user at 1000, so pinning
+# -g/-u 1000 collides (groupadd exit 4).
+RUN groupadd appuser && \
+    useradd -g appuser -m -s /usr/sbin/nologin appuser && \
     mkdir -p /app && \
     chown -R appuser:appuser /app
 
