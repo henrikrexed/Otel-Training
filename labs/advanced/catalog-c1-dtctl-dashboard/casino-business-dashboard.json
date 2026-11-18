@@ -1,15 +1,8 @@
 {
   "version": 18,
-  "variables": [
-    {
-      "key": "game",
-      "visible": true,
-      "type": "query",
-      "version": 2,
-      "input": "fetch dt.entity.custom_device | fields game = casino.game.name",
-      "multiple": true
-    }
-  ],
+  "name": "casino-business-overview",
+  "description": "Vegas Casino business + RED overview (Step-2 metrics + Catalog B1 spanmetrics).",
+  "variables": [],
   "tiles": {
     "header": {
       "type": "markdown",

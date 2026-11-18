@@ -10,14 +10,15 @@ metrics into a live casino dashboard — dashboards as code, no clicking.
 | File | Role |
 |---|---|
 | `casino-business-dashboard.json` | The dashboard document — 24-column grid, tiles built on `casino.bets.count`, `casino.wager.amount`, and the Catalog B1 `casino.red.*` RED metrics. |
-| `dtctl-apply.sh` | Validate (`dtctl dashboard validate`) then deploy (`dtctl dashboard apply`) — the manual equivalent of what opencode generates. |
+| `dtctl-apply.sh` | Validate (`dtctl apply -f … --dry-run`) then deploy (`dtctl apply -f …`) — the manual equivalent of what opencode generates. |
 
 ## Why dtctl (and not the UI)
 
 A dashboard clicked together in the UI is invisible to review and impossible to
-reproduce per attendee. As a **document applied with `dtctl`** it is version
-controlled, diffable, and deployable from the same codespace that runs the labs —
-and `dtctl validate` fails closed on a bad DQL or schema before anything ships.
+reproduce per attendee. As a **document applied with `dtctl apply -f`** it is
+version controlled, diffable, and deployable from the same codespace that runs the
+labs — and `dtctl apply -f … --dry-run` fails closed on a bad DQL or schema before
+anything ships.
 This mirrors the mandatory **dt-app-dashboards** discipline (define purpose →
 explore data → validate DQL → construct JSON → deploy); here opencode performs
 those steps against the metrics you already emit.

@@ -6,18 +6,28 @@
 # environment — no extra secret. In the exercise, opencode drives the `dtctl`
 # skill to GENERATE this document from the Step-2 metrics; this script is the
 # equivalent manual apply so facilitators can deploy the reference directly.
+#
+# dtctl is kubectl-style: `apply -f <file>` (with `--dry-run` to validate first),
+# not a `dashboard <verb>` command group. The dashboard identity comes from the
+# document body (the `name` field), so we stamp PARTICIPANT_ID into a copy.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOC="${HERE}/casino-business-dashboard.json"
 NAME="${PARTICIPANT_ID:-casino}-business-overview"
 
-# Validate the document before deploying (dt-app-dashboards discipline: never
-# push an unvalidated dashboard). dtctl validates the schema and the DQL.
-dtctl dashboard validate --file "${DOC}"
+# Stamp the per-attendee name into the document body (identity is in the JSON,
+# not a flag). Requires jq (present in the codespace).
+RENDERED="$(mktemp)"
+trap 'rm -f "${RENDERED}"' EXIT
+jq --arg n "${NAME}" '.name = $n' "${DOC}" > "${RENDERED}"
 
-# Create or update the dashboard named after the participant.
-dtctl dashboard apply --name "${NAME}" --file "${DOC}"
+# Validate before deploying (dt-app-dashboards discipline: never push an
+# unvalidated dashboard). --dry-run is fail-closed on a bad schema or DQL.
+dtctl apply -f "${RENDERED}" --dry-run
+
+# Create or update the dashboard.
+dtctl apply -f "${RENDERED}"
 
 echo "Deployed dashboard: ${NAME}"
 echo "Open it from Dynatrace > Dashboards, or re-run with an edited ${DOC}."

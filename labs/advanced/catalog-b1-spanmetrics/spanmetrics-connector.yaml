@@ -29,6 +29,10 @@ connectors:
     exemplars:
       enabled: true          # link each bucket back to an exemplar trace
     metrics_flush_interval: 15s
+    # Emit DELTA temporality to match this tenant's convention — the baseline
+    # metrics pipeline runs cumulativetodelta, but the connector output does NOT
+    # pass through it, so set it here (otherwise casino.red.* ships cumulative).
+    aggregation_temporality: AGGREGATION_TEMPORALITY_DELTA
 
 service:
   pipelines:

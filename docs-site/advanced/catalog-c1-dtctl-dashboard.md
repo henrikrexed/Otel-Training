@@ -16,8 +16,8 @@ with the `dtctl` skill through a prompt **ladder**; no clicking in the UI.
 flowchart LR
   m["Step-2 metrics<br/>casino.bets.count<br/>casino.wager.amount<br/>casino.red.*"] --> oc["opencode<br/>(dtctl skill)"]
   oc --> doc["dashboard document<br/>(24-col grid JSON)"]
-  doc --> v["dtctl dashboard validate"]
-  v --> dt["dtctl dashboard apply<br/>→ Dynatrace"]
+  doc --> v["dtctl apply -f … --dry-run<br/>(validate)"]
+  v --> dt["dtctl apply -f …<br/>→ Dynatrace"]
 ```
 
 ## ① Problem — the metrics exist, but no one is watching them
@@ -33,9 +33,12 @@ with `dtctl`**: version controlled, diffable, deployed from the same codespace.
 You produce a dashboard **document** (reference:
 `labs/advanced/catalog-c1-dtctl-dashboard/casino-business-dashboard.json`) on a
 **24-column grid**, with tiles built on DQL over your metrics, and deploy it with
-`dtctl` — which **validates schema and DQL before anything ships** (fail-closed).
-This mirrors the mandatory **dt-app-dashboards** discipline: define purpose →
-explore the data → validate DQL → construct the JSON → deploy.
+`dtctl apply -f <file>` — running `--dry-run` first, which **validates schema and
+DQL before anything ships** (fail-closed). `dtctl` is kubectl-style (`apply` /
+`verify` / `get` over a resource); there is no `dtctl dashboard` verb group, and
+the dashboard's identity comes from the `name` field **in the document body**,
+not a `--name` flag. This mirrors the mandatory **dt-app-dashboards** discipline:
+define purpose → explore the data → validate DQL → construct the JSON → deploy.
 
 | Tile | DQL | Reads |
 |---|---|---|
@@ -76,20 +79,27 @@ explore the data → validate DQL → construct the JSON → deploy.
 
     ```text
     Add a markdown header tile across the top and a single-value tile for total
-    wagered in the last hour. Name the dashboard after my PARTICIPANT_ID.
+    wagered in the last hour. Set the dashboard's name field in the document body
+    to include my PARTICIPANT_ID (dtctl takes identity from the document, not a
+    flag).
     ```
-    **What you should see:** a markdown tile at row 0 and a `singleValue` tile.
-    **Review check:** the dashboard name includes the participant id.
+    **What you should see:** a markdown tile at row 0, a `singleValue` tile, and a
+    top-level `name` field in the JSON.
+    **Review check:** the `name` is in the document body — not passed as a
+    `--name` flag (which `apply` ignores).
 
 === "P4 · Steer — validate then deploy"
 
     ```text
-    Validate the document with dtctl before deploying, and only apply it if
-    validation passes. Show me the validation output.
+    Validate the document with `dtctl apply -f <file> --dry-run` before deploying,
+    and only run the real `dtctl apply -f <file>` if the dry-run passes. Show me
+    the dry-run output.
     ```
-    **What you should see:** `dtctl dashboard validate` runs clean, then
-    `dtctl dashboard apply` deploys.
-    **Review check:** the agent refuses to apply if validation fails.
+    **What you should see:** `dtctl apply -f … --dry-run` runs clean (fail-closed on
+    bad schema/DQL), then `dtctl apply -f …` deploys.
+    **Review check:** the agent uses `dtctl apply -f` (kubectl-style) — not a
+    non-existent `dtctl dashboard` command — and refuses to deploy if the dry-run
+    fails.
 
 ## ④ Review & apply
 
@@ -105,7 +115,7 @@ bash labs/advanced/catalog-c1-dtctl-dashboard/dtctl-apply.sh
 - Open **Dynatrace → Dashboards** and find `${PARTICIPANT_ID}-business-overview`.
 - Each tile renders data: bets-by-outcome trends, a wager-p90 bar per game, the
   RED call-rate and duration charts.
-- Re-run `dtctl dashboard validate --file …` — it exits 0 (schema + DQL valid).
+- Re-run `dtctl apply -f … --dry-run` — it exits 0 (schema + DQL valid).
 
 Confirm the queries resolve directly in a Notebook:
 
@@ -118,8 +128,10 @@ timeseries bets = sum(casino.bets.count), by: { casino.outcome }, from: now() - 
   RED health, deployed entirely from code.
 
 !!! warning "If the agent gets it wrong — steer it back"
-    - **Applies without validating:** *"always run dtctl dashboard validate first
-      and only apply if it passes."*
+    - **Applies without validating:** *"always run `dtctl apply -f … --dry-run`
+      first and only deploy if it passes."*
+    - **Reaches for a `dtctl dashboard` command:** *"dtctl is kubectl-style — use
+      `dtctl apply -f <file>`, there is no `dtctl dashboard` verb group."*
     - **Invents metric or field names:** *"only use metrics that P1 confirmed
       return data — do not guess field names."*
     - **Tiles overflow the grid:** *"the grid is 24 columns wide; keep tile x + w ≤
@@ -130,8 +142,8 @@ timeseries bets = sum(casino.bets.count), by: { casino.outcome }, from: now() - 
 ## Definition of done
 
 - [ ] Dashboard document built on the 24-column grid from Step-2 + B1 metrics
-- [ ] All DQL validated (`dtctl dashboard validate` exits 0)
-- [ ] Deployed with `dtctl dashboard apply`, named after `PARTICIPANT_ID`
+- [ ] All DQL validated (`dtctl apply -f … --dry-run` exits 0)
+- [ ] Deployed with `dtctl apply -f …`; dashboard `name` in the document body includes `PARTICIPANT_ID`
 - [ ] Every tile renders data in Dynatrace
 - [ ] No credentials embedded in the document
 

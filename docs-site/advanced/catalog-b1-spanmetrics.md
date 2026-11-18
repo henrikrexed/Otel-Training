@@ -50,6 +50,7 @@ connectors:
       - name: casino.game.name
       - name: casino.outcome
     namespace: casino.red
+    aggregation_temporality: AGGREGATION_TEMPORALITY_DELTA   # match tenant delta convention
 service:
   pipelines:
     traces:
@@ -64,6 +65,13 @@ RED maps to: `casino.red.calls` (rate), the same metric split by
 `status.code` (errors), and `casino.red.duration` (duration histogram). Keep the
 dimensions **bounded** — `span.name`, `status.code`, and the two casino dims —
 never `player.id`/`round.id`.
+
+!!! note "Delta temporality"
+    The baseline metrics pipeline converts counters to delta via
+    `cumulativetodelta`, but connector output does **not** pass through it. Set
+    `aggregation_temporality: AGGREGATION_TEMPORALITY_DELTA` on the connector so
+    `casino.red.*` follows the tenant's delta convention instead of shipping
+    cumulative.
 
 ## ③ Drive opencode — the prompt ladder
 
