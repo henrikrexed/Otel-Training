@@ -176,7 +176,9 @@ richer and more useful for debugging individual players."
   reject it. Per-player detail belongs on the Step 1 **spans**, where cardinality
   is free; on metrics it explodes the series count.
 - **Review check:** did you reject the per-player/per-round dimension and keep the
-  metrics at **≤ 12 bounded series** (only `casino.game.name` + `casino.outcome`)?
+  dimensions bounded to only `casino.game.name` + `casino.outcome` — so the slots
+  service emits ~3 series (slots × win/lose/jackpot) and the casino tops out at
+  **≤ 12** (4 games × 3 outcomes)?
 
 ## ④ Review & apply — commit → Argo CD sync
 
@@ -210,8 +212,10 @@ timeseries wager_p90 = percentile(casino.wager.amount, 90), by: { casino.game.na
 - **Before:** both metrics are **absent** — `casino.bets.count` /
   `casino.wager.amount` do not exist; the queries return nothing.
 - **After:** `casino.bets.count` returns one series per `casino.game.name` ×
-  `casino.outcome` (≤ 12 series — bounded on purpose), and
-  `casino.wager.amount` returns a p90 wager per game.
+  `casino.outcome`. The slots service alone emits **~3 series** (slots ×
+  win/lose/jackpot) — that is expected, not "short"; the **≤ 12** ceiling is the
+  casino-wide bound (4 games × 3 outcomes) once every game is instrumented. Both
+  are bounded on purpose. `casino.wager.amount` returns a p90 wager per game.
 
 ### Build a DQL tile
 
@@ -248,7 +252,7 @@ chart — this is the business view a casino operator would actually watch:
 
 - [ ] `casino.bets.count` counter and `casino.wager.amount` histogram emitted from the slots service
 - [ ] Both carry **only** `casino.game.name` + `casino.outcome` (no player/round id)
-- [ ] The counter DQL returns ≤ 12 bounded series
+- [ ] The counter DQL returns bounded series (~3 from slots alone; ≤ 12 casino-wide)
 - [ ] The histogram DQL returns a p90 wager per game
 - [ ] The histogram uses **explicit bucket boundaries** sized for casino bets (not SDK defaults)
 - [ ] You **rejected** the high-cardinality (`player.id`/`round.id`) dimension when the agent offered it
