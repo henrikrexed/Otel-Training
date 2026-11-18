@@ -83,10 +83,19 @@ Examples:
 Do not "clean up" these on vendor; fixing them is the lab exercise. Parity is
 validated separately (plan ISI-7577 step c4).
 
+## CI
+
+[`.github/workflows/casino-images.yml`](../../.github/workflows/casino-images.yml)
+builds all 8 services (matrix) for `linux/amd64` + `linux/arm64` on every PR
+that touches `apps/casino/**` (build-only, validates both arches) and **pushes**
+to `ghcr.io/<owner>/vegasapp-<svc>` on pushes to `main`/`training/**` and on
+manual `workflow_dispatch`. Tags: short SHA, branch/PR ref, and `latest` on the
+default branch. GHCR login uses the repo's `GITHUB_TOKEN` (`packages: write`).
+
 ## What is NOT here
 
-- No manifest or CI changes — this is source + Dockerfiles only. Manifests still
-  reference the published `vegasapp-<svc>` images; repointing them to locally
-  built images is a later plan step.
+- **No manifest changes.** Manifests still pin the published
+  `vegasapp-<svc>:0.39` images; repointing them to CI-built tags is a later plan
+  step (the workflow publishes SHA/branch tags, not `:0.39`).
 - `k6` load generator and `playwright` are test harnesses, not app services, and
   are out of scope for the 8 vendored services.
