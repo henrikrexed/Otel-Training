@@ -11,14 +11,22 @@ RUN mvn dependency:go-offline -B
 COPY scoring/src ./src
 RUN mvn clean package -DskipTests -B
 
-# Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+# Runtime stage.
+# Use the Ubuntu-based Temurin JRE (multi-arch: linux/amd64 + linux/arm64).
+# The -alpine (musl) Temurin JRE is published for amd64 only, so it breaks the
+# arm64 leg of the multi-arch build.
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
-# Create non-root user
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser && \
+# wget for the container HEALTHCHECK (not shipped in the base image).
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends wget && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create non-root user (Debian-style tools, not Alpine busybox)
+RUN groupadd -g 1000 appuser && \
+    useradd -u 1000 -g appuser -m -s /usr/sbin/nologin appuser && \
     mkdir -p /app && \
     chown -R appuser:appuser /app
 
