@@ -74,7 +74,13 @@
         <dependency>
             <groupId>io.opentelemetry.semconv</groupId>
             <artifactId>opentelemetry-semconv</artifactId>
-            <version>1.32.0</version>
+            <!-- Pinned pre-split: semconv 1.26.0-alpha+ removed the single
+                 io.opentelemetry.semconv.ResourceAttributes class (referenced by
+                 OpenTelemetryConfig.java) in favour of per-namespace classes.
+                 1.25.0-alpha still ships ResourceAttributes, so the source
+                 compiles unchanged — including the planted programmatic-config
+                 defect (labs/defects.md D4). -->
+            <version>1.25.0-alpha</version>
         </dependency>
         <dependency>
             <groupId>io.opentelemetry</groupId>
