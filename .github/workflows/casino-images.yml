@@ -1,0 +1,97 @@
+name: Build casino images
+
+# Builds the 8 vendored casino service images from apps/casino/.
+# - Pull requests: build only (validates amd64 + arm64 build, no push).
+# - Pushes to the training lineage / main + manual dispatch: build and push to
+#   GHCR under ghcr.io/<owner>/vegasapp-<svc> (same namespace the manifests use).
+on:
+  push:
+    branches:
+      - main
+      - "training/**"
+    paths:
+      - "apps/casino/**"
+      - ".github/workflows/casino-images.yml"
+  pull_request:
+    paths:
+      - "apps/casino/**"
+      - ".github/workflows/casino-images.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - frontend
+          - slots
+          - blackjack
+          - dashboard
+          - gateway
+          - roulette
+          - dice
+          - scoring
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # GHCR image names must be lowercase; the owner login already is, but
+      # normalise defensively so forks with mixed-case owners still work.
+      - name: Compute image name
+        id: img
+        run: echo "name=${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/vegasapp-${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+
+      # QEMU is only needed to emulate arm64 RUN steps (npm/pip/mvn) on the
+      # amd64 runner. The Go `dice` service cross-compiles natively via
+      # --platform=$BUILDPLATFORM, so it does not rely on emulation.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.img.outputs.name }}
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/casino
+          file: apps/casino/${{ matrix.service }}/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          # Build only on PRs (no registry credentials from forks); push on
+          # branch pushes and manual dispatch.
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=vegasapp-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=vegasapp-${{ matrix.service }}
+          # Skip the extra provenance/attestation manifest so the pushed tag is
+          # a plain multi-arch image index that kind/containerd pull cleanly.
+          provenance: false

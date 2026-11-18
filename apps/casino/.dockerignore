@@ -1,0 +1,10 @@
+# Build context = apps/casino/ — keep it lean and reproducible.
+# Dependencies are installed inside the image (npm install / mvn / go mod),
+# never copied from the host.
+**/node_modules
+**/target
+**/__pycache__
+**/*.log
+**/npm-debug.log
+.git
+.DS_Store

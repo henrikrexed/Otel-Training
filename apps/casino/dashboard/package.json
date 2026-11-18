@@ -1,0 +1,35 @@
+{
+  "name": "vegas-dashboard-service",
+  "version": "2.1.0",
+  "description": "Vegas Casino Dashboard Service - Analytics and visualization dashboard",
+  "main": "dashboard-service.js",
+  "scripts": {
+    "start": "node dashboard-service.js",
+    "dev": "node dashboard-service.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "casino",
+    "dashboard",
+    "analytics",
+    "visualization",
+    "opentelemetry"
+  ],
+  "author": "Dynatrace Vegas Team",
+  "license": "MIT",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.6",
+    "@grpc/proto-loader": "^0.8.1",
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.82.0",
+    "@opentelemetry/core": "^3.0.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.300.0",
+    "@opentelemetry/resources": "^3.0.0",
+    "@opentelemetry/sdk-node": "^0.300.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2"
+  }
+}
