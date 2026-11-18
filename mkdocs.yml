@@ -81,6 +81,11 @@ nav:
       - Step 5 — High-cardinality metrics: advanced/step-5-high-cardinality.md
       - Step 6 — PII in logs: advanced/step-6-pii-logs.md
       - Step 7 — Tail sampling: advanced/step-7-tail-sampling.md
+      - Catalog (extra exercises):
+          - Overview: advanced/catalog.md
+          - "A1 — Fix a broken trace [25m][med]": advanced/catalog-a1-broken-trace.md
+          - "B1 — RED metrics from spans [20m][med]": advanced/catalog-b1-spanmetrics.md
+          - "C1 — Dashboard via dtctl [20m][med]": advanced/catalog-c1-dtctl-dashboard.md
 
 plugins:
   - search
