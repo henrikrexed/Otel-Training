@@ -57,18 +57,35 @@ the fix from a blank file — you observe the symptom in Dynatrace, then drive t
 review the diff, apply it, and verify with a DQL checkpoint. Learn the loop once
 here; every step is a variation on it.
 
+The memorable three-beat slogan — **Problem → Opencode → Verify** — expands into
+five stages on every step page, and the "Opencode" beat is itself a short
+**prompt ladder**, not one giant prompt:
+
 ```mermaid
 flowchart LR
   p["① Problem<br/>see the symptom in Dynatrace<br/>(missing span, climbing series, PII)"]
-  o["② Opencode<br/>prompt the agent: goal + target file + skill"]
-  r["③ Review<br/>read the diff it produces"]
-  a["④ Apply<br/>app → commit → Argo sync<br/>collector → kubectl apply"]
+  u["② Understand<br/>read the concept + annotated diff<br/>ask the agent to explain first"]
+  d["③ Drive<br/>a prompt ladder:<br/>P1 orient, P2 core, P3 deepen, P4 steer"]
+  r["④ Review and apply<br/>read the diff, then commit to Argo or kubectl apply"]
   v["⑤ Verify<br/>re-run the DQL checkpoint"]
-  p --> o --> r --> a --> v
-  v -. "not fixed? steer it back" .-> o
+  p --> u --> d --> r --> v
+  v -. "not fixed? steer the ladder back" .-> d
 ```
 
-Each step gives you a **copy-pasteable prompt** with three things the agent needs:
+**Why a ladder, not one mega-prompt.** Firing a single huge instruction at the
+agent and hoping is not the skill — *steering* is. So the Drive stage (③) breaks
+into numbered rungs you climb one at a time, reading the result of each before
+the next:
+
+| Rung | Purpose |
+|---|---|
+| **P1 · Orient** | Read-only — make the agent explain the target and what it would change, *before* any edit. |
+| **P2 · Core** | The main fix. |
+| **P3 · Deepen** | An iterative extension (a second service, a second dimension, a tighter policy). |
+| **P4 · Steer** | Catch a planted miss or tighten an invariant — the correction muscle. |
+
+Each rung's `opencode run "..."` prompt names the same three things the agent
+needs:
 
 1. **The goal** — what telemetry should exist afterwards, in plain terms.
 2. **The target file** — e.g. `observability/collectors/gateway.yaml` for a

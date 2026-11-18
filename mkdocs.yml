@@ -72,6 +72,7 @@ nav:
   # Step 0 warmup + Step 2 business metrics, steps renumbered.
   - Advanced self-paced track:
       - Getting started: advanced/getting-started.md
+      - Choose your path (facilitator menu): advanced/choose-your-path.md
       - The environment: advanced/environment.md
       - Step 0 — Warmup: advanced/step-0-warmup.md
       - Step 1 — Instrument with AI agents: advanced/step-1-instrument-with-agents.md

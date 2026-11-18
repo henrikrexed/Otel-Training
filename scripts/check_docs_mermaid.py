@@ -29,6 +29,7 @@ BOX_CHARS = set("─│┌┐└┘├┤┬┴┼▶▲▼◀�──")
 M_PAGES = [f"module-{i}" for i in range(1, 6)] + ["setup"]
 ADVANCED_PAGES = [
     "advanced/getting-started",
+    "advanced/choose-your-path",
     "advanced/environment",
     "advanced/step-0-warmup",
     "advanced/step-1-instrument-with-agents",
