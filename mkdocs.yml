@@ -84,7 +84,10 @@ nav:
       - Catalog (extra exercises):
           - Overview: advanced/catalog.md
           - "A1 — Fix a broken trace [25m][med]": advanced/catalog-a1-broken-trace.md
+          - "A2 — Log ↔ trace correlation [20m][med]": advanced/catalog-a2-log-trace-correlation.md
+          - "A3 — Multi-language instrumentation [25m][med]": advanced/catalog-a3-multi-language.md
           - "B1 — RED metrics from spans [20m][med]": advanced/catalog-b1-spanmetrics.md
+          - "B3 — Drop noise (filter) [15m][easy]": advanced/catalog-b3-filter-drop-noise.md
           - "C1 — Dashboard via dtctl [20m][med]": advanced/catalog-c1-dtctl-dashboard.md
 
 plugins:
