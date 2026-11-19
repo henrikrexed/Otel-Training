@@ -237,17 +237,26 @@ else
   fail "runner Deployment '$RUNNER_DEPLOY' missing — run gitops/install/register-gitea-runner.sh"
 fi
 
-# 4c. Container registry reachable via the WS-D alias. The alias resolves to the
-# published NodePort, so from the codespace host it is localhost:30001 — the same
-# endpoint gitea.local:30001 maps to. A 200/401 from /v2/ both prove the registry
-# is up (401 = up but anonymous pull disabled; still "reachable").
-REG_URL="http://${GITEA_URL#http://}"              # normalise to the NodePort host
-REG_URL="${REG_URL%/}/v2/"
-code=$(curl -s -o /dev/null -w '%{http_code}' -u "${GITEA_USER}:${GITEA_PASS}" "$REG_URL" 2>/dev/null)
+# 4c. Container registry reachable via the WS-D alias. Try the alias host FIRST
+# (gitea.local:30001) so this actually exercises the /etc/hosts alias resolution
+# create-cluster.sh wires (gitea.local -> 127.0.0.1); fall back to the plain
+# NodePort host if the alias is not on /etc/hosts. A 200/401 from /v2/ both prove
+# the registry is up (401 = up but anonymous pull disabled; still "reachable").
+ALIAS_URL="http://${REGISTRY_ALIAS}/v2/"
+NODE_URL="http://${GITEA_URL#http://}"; NODE_URL="${NODE_URL%/}/v2/"
+code=$(curl -s -o /dev/null -w '%{http_code}' -u "${GITEA_USER}:${GITEA_PASS}" "$ALIAS_URL" 2>/dev/null)
 if [[ "$code" == "200" || "$code" == "401" ]]; then
-  pass "Gitea container registry /v2/ reachable via the WS-D alias ($REGISTRY_ALIAS -> $REG_URL, HTTP $code)"
+  pass "Gitea registry /v2/ reachable via the WS-D alias ($ALIAS_URL, HTTP $code)"
 else
-  fail "Gitea registry /v2/ not reachable (HTTP ${code:-000} at $REG_URL) — is [packages] enabled?"
+  # Alias not resolvable here (no /etc/hosts entry) — confirm via the NodePort,
+  # which is the same endpoint the alias maps to, and say so honestly.
+  info "alias host $REGISTRY_ALIAS not resolvable from here (HTTP ${code:-000}) — retrying via the NodePort"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -u "${GITEA_USER}:${GITEA_PASS}" "$NODE_URL" 2>/dev/null)
+  if [[ "$code" == "200" || "$code" == "401" ]]; then
+    pass "Gitea registry /v2/ reachable via the NodePort ($NODE_URL, HTTP $code; alias maps to this endpoint)"
+  else
+    fail "Gitea registry /v2/ not reachable (HTTP ${code:-000} at $NODE_URL) — is [packages] enabled?"
+  fi
 fi
 
 # --- Summary ----------------------------------------------------------------

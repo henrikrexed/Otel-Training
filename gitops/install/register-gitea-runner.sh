@@ -58,31 +58,39 @@ if [[ -z "$TOKEN" ]]; then
   exit 0
 fi
 log "    token acquired (${#TOKEN} chars) — storing in Secret/$RUNNER_SECRET"
-$KUBECTL -n "$GITEA_NS" create secret generic "$RUNNER_SECRET" \
-  --from-literal=token="$TOKEN" \
-  --dry-run=client -o yaml | $KUBECTL apply -f - >/dev/null 2>&1 \
+# Merge-patch just data.token so the Secret's app.kubernetes.io/* labels survive
+# (a create --dry-run | apply would replace the object and drop them).
+TOKEN_B64="$(printf '%s' "$TOKEN" | base64 | tr -d '\n')"
+$KUBECTL -n "$GITEA_NS" patch secret "$RUNNER_SECRET" --type=merge \
+  -p "{\"data\":{\"token\":\"$TOKEN_B64\"}}" >/dev/null 2>&1 \
   || warn "could not update Secret/$RUNNER_SECRET"
 
 # ---------------------------------------------------------------------------
-log "3/4 patching the runner hostAliases so the build daemon reaches $REGISTRY_ALIAS_HOST:30001"
+# 3/4: one merge-patch that (a) sets the node-IP hostAlias so the build daemon
+# reaches $REGISTRY_ALIAS_HOST:30001 over the NodePort, and (b) bumps a
+# restartedAt annotation. Both land in a single rollout — the restart is what
+# makes the runner re-read the new secretKeyRef token, so we never roll twice.
+log "3/4 patching the runner (hostAlias + restart to pick up the token)"
+RESTART_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo manual)"
 NODE_IP="$($KUBECTL get nodes \
   -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null \
   | awk '{print $1}')"
+HOSTALIASES_JSON='[]'
 if [[ -n "$NODE_IP" ]]; then
-  log "    kind node InternalIP = $NODE_IP"
-  $KUBECTL -n "$GITEA_NS" patch deploy "$RUNNER_DEPLOY" --type=merge -p \
-    "{\"spec\":{\"template\":{\"spec\":{\"hostAliases\":[{\"ip\":\"$NODE_IP\",\"hostnames\":[\"$REGISTRY_ALIAS_HOST\"]}]}}}}" \
-    >/dev/null 2>&1 \
-    && log "    hostAliases patched ($REGISTRY_ALIAS_HOST -> $NODE_IP)" \
-    || warn "could not patch runner hostAliases (push to the alias may fail)"
+  log "    kind node InternalIP = $NODE_IP (hostAlias $REGISTRY_ALIAS_HOST -> $NODE_IP)"
+  HOSTALIASES_JSON="[{\"ip\":\"$NODE_IP\",\"hostnames\":[\"$REGISTRY_ALIAS_HOST\"]}]"
 else
   warn "could not determine the kind node InternalIP — leaving hostAliases empty."
   warn "the runner can still register; image push to $REGISTRY_ALIAS_HOST:30001 may need a manual host entry."
 fi
+$KUBECTL -n "$GITEA_NS" patch deploy "$RUNNER_DEPLOY" --type=merge -p \
+  "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"gitops.otel.training/restartedAt\":\"$RESTART_TS\"}},\"spec\":{\"hostAliases\":$HOSTALIASES_JSON}}}}" \
+  >/dev/null 2>&1 \
+  && log "    runner patched (single rollout)" \
+  || warn "could not patch runner Deployment (token/hostAlias may not apply)"
 
 # ---------------------------------------------------------------------------
-log "4/4 restarting the runner to pick up the token + hostAliases, then waiting"
-$KUBECTL -n "$GITEA_NS" rollout restart deploy/"$RUNNER_DEPLOY" >/dev/null 2>&1 || true
+log "4/4 waiting for the runner to roll + register"
 if $KUBECTL -n "$GITEA_NS" rollout status deploy/"$RUNNER_DEPLOY" --timeout=120s >/dev/null 2>&1; then
   # Give act_runner a few seconds to register + send its first heartbeat.
   sleep 8
