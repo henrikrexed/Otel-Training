@@ -38,8 +38,8 @@ from each attendee's Gitea repo). Services and their lab/module dependencies:
 | 2 | `vegas-casino-scoring` (20) | Deployment | **Java** service; service.name/log/collector defects #2–#4 live here | M1 (service.name), M2 (logs), A2 (log↔trace), A3 (multi-language) | **No — core** |
 | 3 | `vegas-casino-slots` (30) | Deployment | Node game service; trace-propagation defect #1 | M1 propagation lab, A1 (broken trace), B1 (spanmetrics) | **No — core** |
 | 4 | `vegas-casino-blackjack` (33) | Deployment | Node game service (2nd game = non-trivial topology) | M1 propagation, topology view, B1 spanmetrics per-service | **No — core** |
-| 5 | `vegas-casino-roulette` (31) | Deployment | Node game service | redundant topology breadth; **no lab references it uniquely** | **Yes — lite drops** |
-| 6 | `vegas-casino-dice` (32) | Deployment | **Go** game service (getEnvOrAttr clusterName reader) | A3 multi-language *mentions* Go, but scoring(Java)+slots(Node) already cover polyglot | **Yes — lite drops** |
+| 5 | `vegas-casino-roulette` (31) | Deployment | **Python** game service | **A3 (multi-language)** uses roulette as its PRIMARY deployed target (`catalog.md:17`; `labs/advanced/catalog-a3-multi-language/{before,after}.roulette-spin.py`); also a comparison span in `module-1.md:49` (blackjack is the alternative there) | **Yes — lite drops (A3 target)** |
+| 6 | `vegas-casino-dice` (32) | Deployment | **Go** game service (getEnvOrAttr clusterName reader) | A3 (multi-language) documented **alternative** target to roulette; completes the 4-language polyglot (Java / Node / Python / Go) | **Yes — lite drops (A3 alt target)** |
 | 7 | `vegas-casino-dashboard` (40) | Deployment | Aggregation/read service | dashboard view only; no unique lab | optional (kept — cheap) |
 | 8 | `vegas-casino-redis` (10) | Deployment | Backing store (cache) | required by frontend/games at runtime | **No — core** |
 | 9 | `vegas-casino-postgresql` (11) | Deployment | Backing store (scores) | required by scoring; DB spans | **No — core** |
@@ -51,11 +51,17 @@ from each attendee's Gitea repo). Services and their lab/module dependencies:
 
 - **Minimum viable topology for the full lab story = scoring (Java) + slots (Node)
   + blackjack (Node) + frontend + redis + postgres + loadgen + gateway.**
-  That preserves: polyglot (Java+Node), multi-game topology (2 games), every
-  planted defect (#1–#6), and all catalog exercises A1/A2/A3/B1.
-- **roulette and dice are the only services no lab uniquely depends on.** dice is
-  Go, so dropping it narrows polyglot coverage from 3 languages to 2 — acceptable
-  for a *local/lite* run (A3 multi-language is a stretch catalog item, not core M1).
+  That preserves: Java+Node coverage, multi-game topology (2 games), every
+  planted defect (#1–#6), and catalog exercises A1/A2/B1. **A3 (multi-language)
+  is the deliberate exception** — it deploys the Python/Go games, so the
+  minimum-viable/lite set drops A3's targets (see next point).
+- **roulette and dice are the only two games no *core* module uniquely depends
+  on**, but catalog **A3 (multi-language)** deploys them: roulette (Python) is
+  A3's primary target and dice (Go) its documented alternative. Casino is a
+  **4-language polyglot** (Java scoring, Node slots/blackjack, Python roulette,
+  Go dice), so dropping **both** removes the only target(s) A3 can run against —
+  an **accepted stretch-item sacrifice** (A3 is a stretch catalog item, not core
+  M1), not a "3→2 language narrowing."
 - **Nothing breaks** if roulette+dice are removed, *provided* the loadgen k6 script
   tolerates their absence (see impl note). → D2 "lite" profile is safe.
 
@@ -124,16 +130,26 @@ substitution point proposed for the lite profile. Rationale:
 - "Before any collector lab" (D1) is satisfied: the value is baked at deploy,
   not in a processor the attendee edits in M3.
 
-### ⚠️ Lab-story collision the impl MUST resolve
+### ⚠️ Potential future lab-story collision (not a live conflict)
 
-`labs/defects.md` **defect #5 (M3)** has the collector insert
-`k8s.cluster.name = ${CLUSTERNAME}` via a `resource` processor as *the M3
-enrichment the attendee fixes*. If D1 makes `k8s.cluster.name` work from M1, that
-M3 enrichment becomes redundant and the lab loses its "aha." Per D1 ("keep the
-planted defect scoped to a different, clearly-M3 enrichment"), **re-scope the M3
-enrichment** to a different attribute — recommended: `k8s.cluster.uid`,
-`deployment.environment`, or a cost-center dimension (ties to B2/C4). Update
-`labs/defects.md` accordingly so the M3 story still works.
+`labs/defects.md` **defect #5 (M3 — "Collector Processor Order Issues + Missing
+Memory Limiter")** is written against the **legacy `Perform-Hackathon-2026`
+collector config** (`otel-collector-statefulset-config.yaml`), not the current
+`gateway.yaml`. In that legacy config a `resource` processor inserts
+`k8s.cluster.name = ${CLUSTERNAME}`, and the audit itself marks that insert
+**"✅ Good"** — it is **not** the enrichment the attendee fixes (defect #5 is
+*processor ordering + a missing memory limiter*, not the cluster-name attribute).
+The **current** `gateway.yaml` has **no** `resource` processor and no
+`k8s.cluster.name` insert at all.
+
+So there is **no live collision today**. The concern is **potential and
+future-only**: *if* an M3 lab is ever authored to teach `k8s.cluster.name`
+enrichment via a `resource` processor on the current collector, D1 (which bakes
+`k8s.cluster.name` at the casino ConfigMap from M1) would make that specific
+enrichment redundant. To keep such a future M3 lab's "aha" intact, scope any
+ported enrichment to a *different* attribute — recommended: `k8s.cluster.uid`,
+`deployment.environment`, or a cost-center dimension (ties to B2/C4) — rather
+than `k8s.cluster.name`. No change to `labs/defects.md` is required by D1 today.
 
 → Delegated: **ISI-7633-B (DevOps, coordinate WS1 casino manifests + WS-D Gitea seed)**.
 
