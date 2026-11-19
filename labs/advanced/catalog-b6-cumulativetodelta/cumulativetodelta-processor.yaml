@@ -41,7 +41,7 @@ processors:
     # subsequent points emit the delta. keep | drop change first-point handling.
     initial_value: auto
 
-# The metrics pipeline position is unchanged — cumulative_to_delta stays between
+# The metrics pipeline position is unchanged — cumulative_to_delta stays
 # right after k8sattributes. (Only the processor body changed from `{}` to the
 # explicit config above.)
 service:
