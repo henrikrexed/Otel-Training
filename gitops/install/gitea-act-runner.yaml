@@ -1,0 +1,160 @@
+# gitea-act-runner — the CI worker for the in-cluster Gitea (ISI-7639, WS-A).
+#
+# Parent plan: ISI-7624 (Gitea CI + Packages). Consumes the WS-D registry alias
+# (ISI-7638, gitops/install/registry-mirror.md): the runner builds the casino
+# images and pushes them to  gitea.local:30001/<owner>/<image>:<tag>  — the exact
+# string node containerd pulls back, so push and pull are byte-identical.
+#
+# Shape: one Deployment, two containers in the same pod —
+#   * runner : gitea/act_runner, registers against Gitea and executes workflows.
+#   * dind   : docker:dind, the build daemon act_runner talks to over TCP. It is
+#              the thing that actually `docker build`s and `docker push`es, so it
+#              is the container that must (a) trust the Gitea registry as insecure
+#              and (b) resolve the gitea.local alias.
+#
+# Registration token: NOT baked in. register-gitea-runner.sh generates a global
+# runner-registration token from the Gitea pod, writes it into the Secret below,
+# discovers the kind node IP and patches this Deployment's hostAliases so the
+# build daemon can reach gitea.local:30001 over the node NodePort. All of that is
+# NON-FATAL (ISI-7555 seed pattern): a CI host that fails to come up must never
+# abort the rest of the GitOps bootstrap.
+#
+# Apply order: gitea.yaml  ->  seed-gitea.sh  ->  THIS  ->  register-gitea-runner.sh
+---
+# Placeholder token Secret so the Deployment can start even before registration.
+# register-gitea-runner.sh overwrites data.token with a real registration token
+# and restarts the runner. An empty token just means "not registered yet".
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitea-runner-token
+  namespace: gitea
+  labels:
+    app.kubernetes.io/name: gitea-act-runner
+    app.kubernetes.io/part-of: otel-training-gitops
+type: Opaque
+stringData:
+  token: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-act-runner-config
+  namespace: gitea
+  labels:
+    app.kubernetes.io/name: gitea-act-runner
+data:
+  # act_runner config. Jobs run as docker containers spawned by the dind daemon.
+  # The two labels map the GitHub-style runs-on names casino workflows use to a
+  # Node base image (the casino services are Node + one Go service; a Node image
+  # with docker-in-the-daemon is enough to run buildx/make for all of them).
+  config.yaml: |
+    log:
+      level: info
+    runner:
+      capacity: 1
+      timeout: 30m
+      # Keep the labels simple and explicit — WS-B/WS-C workflows set runs-on to
+      # one of these. docker://... is the base image each job starts from.
+      labels:
+        - "ubuntu-latest:docker://node:20-bookworm"
+        - "ubuntu-22.04:docker://node:20-bookworm"
+    cache:
+      # No remote cache in the lab — keeps the runner self-contained.
+      enabled: false
+    container:
+      # Job containers share the pod network so they reach the dind daemon and,
+      # through it (and the pod hostAliases), the gitea.local:30001 registry.
+      network: host
+      privileged: true
+      valid_volumes:
+        - "**"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea-act-runner
+  namespace: gitea
+  labels:
+    app.kubernetes.io/name: gitea-act-runner
+    app.kubernetes.io/part-of: otel-training-gitops
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate            # dind owns a single emptyDir graph — never two writers
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-act-runner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea-act-runner
+    spec:
+      # hostAliases is patched by register-gitea-runner.sh:
+      #   gitea.local -> <kind node internal IP>
+      # so the dind daemon can push to the WS-D alias over the node NodePort.
+      # Shipped empty; the patch is best-effort and idempotent.
+      hostAliases: []
+      containers:
+        - name: runner
+          image: gitea/act_runner:0.2.11
+          imagePullPolicy: IfNotPresent
+          env:
+            # In-cluster Gitea service — the runner only needs API/registration
+            # reachability here; image push uses the gitea.local alias via dind.
+            - name: GITEA_INSTANCE_URL
+              value: "http://gitea-http.gitea.svc:3000"
+            - name: GITEA_RUNNER_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-runner-token
+                  key: token
+            - name: GITEA_RUNNER_NAME
+              value: "casino-ci"
+            - name: CONFIG_FILE
+              value: "/config/config.yaml"
+            # Talk to the sidecar build daemon over localhost (shared pod netns).
+            - name: DOCKER_HOST
+              value: "tcp://localhost:2375"
+          volumeMounts:
+            - name: runner-data           # holds the .runner registration state
+              mountPath: /data
+            - name: runner-config
+              mountPath: /config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+        - name: dind
+          image: docker:24-dind
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true            # dind needs it to run the nested daemon
+          env:
+            # Disable dind's auto-TLS so the runner can reach it on plain tcp:2375.
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          args:
+            - "--host=tcp://0.0.0.0:2375"
+            # Trust the Gitea container registry (plain HTTP via the alias) so
+            # `docker push gitea.local:30001/...` works without certs.
+            - "--insecure-registry=gitea.local:30001"
+          volumeMounts:
+            - name: dind-storage
+              mountPath: /var/lib/docker
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: runner-data
+          emptyDir: {}
+        - name: runner-config
+          configMap:
+            name: gitea-act-runner-config
+        - name: dind-storage
+          emptyDir: {}
