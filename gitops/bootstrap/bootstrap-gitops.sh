@@ -53,6 +53,13 @@ case "$GITOPS_PROVIDER" in
     log "2/4 seeding Gitea (account + casino repo + manifests)"
     bash "$GITOPS_DIR/install/seed-gitea.sh"
 
+    # CI host (ISI-7639, WS-A): enable Actions + Packages (in gitea.yaml above) and
+    # bring an act_runner online. NON-FATAL (ISI-7555 pattern) — a CI-host hiccup
+    # must never abort the GitOps bootstrap, so the runner register is best-effort.
+    log "2.5/4 enabling Gitea CI (act_runner — best-effort)"
+    $KUBECTL apply -f "$GITOPS_DIR/install/gitea-act-runner.yaml" || true
+    bash "$GITOPS_DIR/install/register-gitea-runner.sh" || true
+
     log "3/4 installing Argo CD"
     bash "$GITOPS_DIR/install/install-argocd.sh"
 

@@ -199,6 +199,66 @@ else
   info "otherwise confirm Argo CD (not kubectl) applied them"
 fi
 
+# --- 4. Gitea CI host: Actions on, runner online, registry reachable (ISI-7639) ---
+# WS-A "Done when": Gitea Actions is on, a runner shows online, and /v2/ responds
+# through the WS-D alias. These checks are additive — a GitOps path without the CI
+# host (older bootstrap) still passes sections 0-3.
+hdr "4. Gitea CI host — Actions + runner + registry (ISI-7639, WS-A)"
+RUNNER_DEPLOY="${RUNNER_DEPLOY:-gitea-act-runner}"
+REGISTRY_ALIAS="${REGISTRY_ALIAS:-gitea.local:30001}"
+
+# 4a. Actions enabled — assert the live Gitea config, not just the manifest.
+actions_on=$(kubectl -n "$GITEA_NS" get configmap gitea-config \
+  -o jsonpath='{.data.GITEA__actions__ENABLED}' 2>/dev/null)
+if [[ "$actions_on" == "true" ]]; then
+  pass "Gitea Actions enabled (GITEA__actions__ENABLED=true)"
+else
+  fail "Gitea Actions not enabled in gitea-config (got '${actions_on:-<none>}')"
+fi
+
+# 4b. Runner online — Deployment Available AND act_runner registered/heartbeating.
+if kubectl -n "$GITEA_NS" get deploy "$RUNNER_DEPLOY" >/dev/null 2>&1; then
+  avail=$(kubectl -n "$GITEA_NS" get deploy "$RUNNER_DEPLOY" \
+    -o jsonpath='{.status.availableReplicas}' 2>/dev/null)
+  if [[ "${avail:-0}" -ge 1 ]]; then
+    pass "runner Deployment '$RUNNER_DEPLOY' is Available ($avail replica)"
+  else
+    fail "runner Deployment '$RUNNER_DEPLOY' has no available replica"
+  fi
+  RPOD=$(kubectl -n "$GITEA_NS" get pod -l app.kubernetes.io/name="$RUNNER_DEPLOY" \
+          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  if [[ -n "$RPOD" ]] && kubectl -n "$GITEA_NS" logs "$RPOD" -c runner 2>/dev/null \
+       | grep -qiE 'runner.*registered|declare successfully|ping.*success|starting runner'; then
+    pass "act_runner registered + online (log shows registration/heartbeat)"
+  else
+    fail "act_runner not confirmed online — check: kubectl -n $GITEA_NS logs deploy/$RUNNER_DEPLOY -c runner"
+  fi
+else
+  fail "runner Deployment '$RUNNER_DEPLOY' missing — run gitops/install/register-gitea-runner.sh"
+fi
+
+# 4c. Container registry reachable via the WS-D alias. Try the alias host FIRST
+# (gitea.local:30001) so this actually exercises the /etc/hosts alias resolution
+# create-cluster.sh wires (gitea.local -> 127.0.0.1); fall back to the plain
+# NodePort host if the alias is not on /etc/hosts. A 200/401 from /v2/ both prove
+# the registry is up (401 = up but anonymous pull disabled; still "reachable").
+ALIAS_URL="http://${REGISTRY_ALIAS}/v2/"
+NODE_URL="http://${GITEA_URL#http://}"; NODE_URL="${NODE_URL%/}/v2/"
+code=$(curl -s -o /dev/null -w '%{http_code}' -u "${GITEA_USER}:${GITEA_PASS}" "$ALIAS_URL" 2>/dev/null)
+if [[ "$code" == "200" || "$code" == "401" ]]; then
+  pass "Gitea registry /v2/ reachable via the WS-D alias ($ALIAS_URL, HTTP $code)"
+else
+  # Alias not resolvable here (no /etc/hosts entry) — confirm via the NodePort,
+  # which is the same endpoint the alias maps to, and say so honestly.
+  info "alias host $REGISTRY_ALIAS not resolvable from here (HTTP ${code:-000}) — retrying via the NodePort"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -u "${GITEA_USER}:${GITEA_PASS}" "$NODE_URL" 2>/dev/null)
+  if [[ "$code" == "200" || "$code" == "401" ]]; then
+    pass "Gitea registry /v2/ reachable via the NodePort ($NODE_URL, HTTP $code; alias maps to this endpoint)"
+  else
+    fail "Gitea registry /v2/ not reachable (HTTP ${code:-000} at $NODE_URL) — is [packages] enabled?"
+  fi
+fi
+
 # --- Summary ----------------------------------------------------------------
 hdr "Summary"
 info "PASS=$PASS  FAIL=$FAIL"

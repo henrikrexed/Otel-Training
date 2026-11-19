@@ -52,6 +52,16 @@ data:
   GITEA__webhook__ALLOWED_HOST_LIST: "*"
   GITEA__repository__DEFAULT_BRANCH: "main"
   GITEA__log__LEVEL: "warn"
+  # --- CI host (ISI-7639, WS-A) ------------------------------------------------
+  # Turn Gitea into a CI host: built-in Actions engine + act_runner, plus the
+  # container registry (Packages) the runner pushes casino images to.
+  #   * [actions] ENABLED — lets repos run workflows and a runner register.
+  #   * [packages] ENABLED — Gitea's container/OCI registry (the /v2/ endpoint
+  #     the WS-D alias gitea.local:30001 resolves to). On by default, but the
+  #     parent plan (ISI-7624 D-series) asks for it explicitly so the CI contract
+  #     is self-documenting and survives an image default-flip.
+  GITEA__actions__ENABLED: "true"
+  GITEA__packages__ENABLED: "true"
 ---
 apiVersion: apps/v1
 kind: Deployment
