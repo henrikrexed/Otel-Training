@@ -137,9 +137,11 @@ bash gitops/bootstrap/bootstrap-gitops.sh
     ```
 
 2. Sign in with the credentials from your handout.
-3. Go to **Infrastructure → Kubernetes** and confirm a cluster named after your
-   `PARTICIPANT_ID` appears (first appearance can take a few minutes).
-4. Open **Distributed traces**. You should see a trickle of traces from the
+3. Press **Ctrl/Cmd+K**, search "Kubernetes", and open **Clusters**. Confirm a
+   cluster named after your `PARTICIPANT_ID` appears (first appearance can take a
+   few minutes).
+4. Press **Ctrl/Cmd+K**, search "Distributed Tracing", and open the **Distributed
+   Tracing** app. You should see a trickle of traces from the
    casino already — the k6 load generator is playing the casino for you. The
    traces will look *broken*. That is intentional; it is Module 1's job.
 
@@ -185,6 +187,23 @@ Open http://localhost:30000, register a player account, and play a few rounds �
 try the slots and another game. Any game works; the point is generating
 telemetry.
 
+!!! warning "The login is fake — use made-up values"
+    The casino has no real auth or user database. The register form (**Player
+    Name**, **Email**, **Profile Type**, **Starting Balance**) just seeds a local
+    session so you have something to play with, so **type made-up values** —
+    invent a name, use a throwaway address like `you@example.com`, pick any
+    **Starting Balance**. For **Profile Type**, choose **Dynatracer** if you work
+    at Dynatrace, **Partner** or **Customer** if that is your relationship,
+    otherwise **Other**; it only tags your telemetry (`user.profile_type`) and
+    changes nothing about the lab.
+
+    What you type never leaves your Codespace **except as telemetry** — spans,
+    metrics, and logs flow to the shared training tenant that every attendee
+    uses. And this casino ships with a planted privacy defect: the frontend runs
+    `AUDIT_LOG_VERBOSITY: verbose`, so your **raw email and client IP** land in
+    `login_audit` log lines on that shared tenant until you fix it in Module 3.
+    One more reason to keep the email fake.
+
 > 30000 is published by the kind control-plane node and forwarded to the
 > codespace, the same way the Gitea (30001) and Argo CD (30002) UIs are.
 
@@ -217,7 +236,7 @@ the gateway log.
 
 - [ ] `kubectl get nodes` shows one Ready node
 - [ ] All pods Running in `casino`, `observability`, `dynatrace`, `gitea`, `argocd`
-- [ ] Your cluster appears under **Infrastructure → Kubernetes** in Dynatrace
+- [ ] Your cluster appears under **Ctrl/Cmd+K → Kubernetes → Clusters** in Dynatrace
 - [ ] Gitea reachable at http://localhost:30001, repo `casino/casino` visible
 - [ ] Casino UI reachable at http://localhost:30000 and you played a round
 - [ ] `otel-gateway` log shows no export errors

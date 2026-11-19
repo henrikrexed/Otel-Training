@@ -111,8 +111,9 @@ You have not instrumented anything yet, so this checkpoint just proves the plumb
 
 1. `echo $DT_TENANT`, open the URL, and sign in with the credentials from your
    handout.
-2. Go to **Infrastructure → Kubernetes** and confirm a cluster named after your
-   `PARTICIPANT_ID` appears (first appearance can take a few minutes).
+2. Press **Ctrl/Cmd+K**, search "Kubernetes", and open **Clusters**. Confirm a
+   cluster named after your `PARTICIPANT_ID` appears (first appearance can take a
+   few minutes).
 3. Set a filter `k8s.cluster.name` = your `PARTICIPANT_ID` and save the view.
    You will reuse it on every step.
 
@@ -122,6 +123,6 @@ You have not instrumented anything yet, so this checkpoint just proves the plumb
 - [ ] You own a fork `https://<gitlab-host>/<attendee>/casino`
 - [ ] `GITLAB_REPO_URL` and `GITLAB_TOKEN` are set as Codespace secrets
 - [ ] The Codespace is created on `main` and post-create setup finished
-- [ ] Your cluster appears under **Infrastructure → Kubernetes** in Dynatrace
+- [ ] Your cluster appears under **Ctrl/Cmd+K → Kubernetes → Clusters** in Dynatrace
 
 Next: [The environment](environment.md).
