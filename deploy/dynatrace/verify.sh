@@ -90,6 +90,34 @@ case "$_op_tok" in
     ;;
 esac
 
+# Tenant-aware ActiveGate image source (ISI-7674). A dev/sprint tenant registry
+# does NOT serve the AG image, so the DynaKube MUST carry
+# feature.dynatrace.com/use-public-registry=true or the AG pull 404s regardless of
+# token type. Derive the tenant host from the live DynaKube apiUrl (falls back to
+# DT_TENANT), then assert the flag matches the tenant class.
+_dk_apiurl=$(kubectl -n "$DT_NAMESPACE" get dynakube "$DYNAKUBE_NAME" \
+  -o jsonpath='{.spec.apiUrl}' 2>/dev/null || true)
+_tenant_host="${_dk_apiurl:-${DT_TENANT:-}}"
+case "$_tenant_host" in
+  *.dev.dynatracelabs.com*|*.sprint.dynatracelabs.com*)
+    _pubreg=$(kubectl -n "$DT_NAMESPACE" get dynakube "$DYNAKUBE_NAME" \
+      -o jsonpath='{.metadata.annotations.feature\.dynatrace\.com/use-public-registry}' 2>/dev/null || true)
+    if [ "$_pubreg" = "true" ]; then
+      pass "dev/sprint tenant + use-public-registry=true (AG pulls from public.ecr.aws)"
+    else
+      fail "dev/sprint tenant but use-public-registry='${_pubreg:-unset}' — that registry does"
+      info "NOT host the AG image, so the pull 404s regardless of token type (ISI-7674). Re-run"
+      info "with DT_USE_PUBLIC_REGISTRY=true bash deploy/dynatrace/install.sh."
+    fi
+    ;;
+  *.live.dynatrace.com*)
+    info "live tenant — AG pulls from the tenant registry (public-registry flag not required)"
+    ;;
+  "")
+    : # tenant host unknown in this shell; skip
+    ;;
+esac
+
 # --- Step 2 (AC): operator / webhook / activegate pods all Running ----------
 hdr "Step 2 — pods Running"
 kubectl -n "$DT_NAMESPACE" get pods -o wide 2>&1 | tee -a "$EVIDENCE"
