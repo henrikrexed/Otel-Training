@@ -26,24 +26,23 @@
 #       (the reference's isolation mechanism) instead of `networkZone`,
 #     * `metadataEnrichment: enabled`.
 #
-# ISI-7674 — tenant-aware ActiveGate image source (reconciles the whole saga).
+# ISI-7547 — explicit public-ECR ActiveGate image pin (ends the whole saga).
 #   The reference above runs on a LIVE/prod tenant (`<env>.live.dynatrace.com`),
 #   whose tenant registry HOSTS the ActiveGate image. Our codespace points at an
-#   internal DEV/sprint tenant (`oat05854.dev.dynatracelabs.com`) whose registry
-#   does NOT serve the AG image, so the pull 404s regardless of token type — the
-#   board confirmed it still `ErrImagePull`s with BOTH tokens swapped to platform
-#   (dt0s16). The fix is tenant-aware: for dev/sprint tenants pull the AG from the
-#   PUBLIC registry (`public.ecr.aws/dynatrace`, which hosts it for every tenant)
-#   via `feature.dynatrace.com/use-public-registry`; for a live tenant the default
-#   tenant-registry pull (reference path) is correct. install.sh AUTO-DETECTS the
-#   tenant class from the apiUrl host and renders this flag accordingly — "true"
-#   for *.dev/*.sprint.dynatracelabs.com, "false" (== default/omitted behaviour)
-#   for *.live.dynatrace.com — so the proven live path is byte-for-byte unchanged.
-#   ISI-7553 had the RIGHT lever for a dev tenant; it only "failed" because it was
-#   tested with classic tokens and an un-rolled pod. The ISI-7673 classic-token
-#   fail-fast guardrail still stands (classic tokens 404 the tenant registry on a
-#   live tenant) but was NOT the dev-tenant fix: dev tenants need platform tokens
-#   AND public registry. Override the auto-detect with DT_USE_PUBLIC_REGISTRY.
+#   internal DEV/sprint tenant (`oat05854.dev.dynatracelabs.com`) that pins a DEV
+#   ActiveGate build which exists ONLY in Dynatrace's private ECR
+#   (478983378254.dkr.ecr.us-east-1.amazonaws.com — needs AWS creds the codespace
+#   lacks). `use-public-registry` did NOT fix it: the operator still RESOLVED that
+#   private dev-build ref and the board saw `ErrImagePull: no basic auth
+#   credentials`, even with BOTH tokens swapped to platform (dt0s16).
+#   The fix is to stop relying on registry RESOLUTION and PIN an explicit GA image
+#   from the ANONYMOUS public registry via `spec.activeGate.image` (below). An
+#   explicit image takes precedence over registry resolution, so it works on every
+#   tenant class — the dev tenant above AND a live tenant (public ECR hosts GA
+#   images for all). The pinned tag is rendered from ${DT_ACTIVEGATE_IMAGE_TAG} by
+#   install.sh (default verified HTTP 200 + multi-arch amd64/arm64). The ISI-7673
+#   classic-token fail-fast guardrail still stands (it catches a dt0c01 operator
+#   token, which breaks the Kubernetes-monitoring API connection independently).
 #
 # apiUrl and the token Secret are injected at install time by install.sh from the
 # per-attendee DT_* env (devcontainer secrets) — never hard-coded here. The
@@ -63,22 +62,18 @@ metadata:
     # without a manual settings step. (Default-on in recent operators; set
     # explicitly so behaviour is obvious and stable across versions.)
     feature.dynatrace.com/automatic-kubernetes-api-monitoring: "true"
-    feature.dynatrace.com/use-public-registry: "true"
     # Per-attendee cluster NAME in Dynatrace Kubernetes API monitoring on the shared
     # tenant, so many attendees stay readable at once. This replaces the old
     # `networkZone` approach and matches the proven reference deployment. Rendered
     # from ${DYNAKUBE_NAME} by install.sh's envsubst (same step that injects apiUrl).
     feature.dynatrace.com/automatic-kubernetes-api-monitoring-cluster-name: "${DYNAKUBE_NAME}"
-    # ISI-7674 — tenant-aware ActiveGate image source. Dev/sprint tenants'
-    # internal registries do NOT serve the AG image (the pull 404s regardless of
-    # token type), so install.sh renders this "true" for *.dev / *.sprint
-    # .dynatracelabs.com to pull the AG from public.ecr.aws/dynatrace (which hosts
-    # it for every tenant). For a live/prod tenant the AG lives in the tenant
-    # registry (the proven reference path), so this renders "false" — identical in
-    # effect to omitting the flag (the operator default). Auto-detected from the
-    # apiUrl host; force either way with DT_USE_PUBLIC_REGISTRY. Rendered by
-    # install.sh's envsubst. See README §"Live vs dev/sprint tenant registry".
-    feature.dynatrace.com/use-public-registry: "${DT_USE_PUBLIC_REGISTRY}"
+    # NOTE: no `use-public-registry` annotation — superseded by the explicit
+    # `spec.activeGate.image` pin below (ISI-7547). `use-public-registry` only asks
+    # the operator to RESOLVE the image, and on a dev/sprint tenant the version it
+    # resolves is a dev build that lives only in Dynatrace's PRIVATE ECR
+    # (478983378254.dkr.ecr.us-east-1.amazonaws.com) → `no basic auth credentials`.
+    # Pinning an explicit GA image from the anonymous public registry avoids that
+    # resolution entirely. See README §"Live vs dev/sprint tenant registry".
 spec:
   # Tenant API endpoint, e.g. https://abc12345.live.dynatrace.com/api
   apiUrl: ${DT_API_URL}
@@ -107,6 +102,20 @@ spec:
   # `routing` / `dynatrace-api` are not needed for K8s monitoring on a single-node
   # kind cluster and are omitted to keep the AG minimal.
   activeGate:
+    # ISI-7547 — pin the ActiveGate image to a GA build on the ANONYMOUS public
+    # registry (public.ecr.aws/dynatrace), rendered from ${DT_ACTIVEGATE_IMAGE_TAG}
+    # by install.sh. An explicit image takes precedence over the operator's
+    # registry resolution, so it works on EVERY tenant class:
+    #   * dev/sprint tenants (e.g. oat05854.dev.dynatracelabs.com), whose internal
+    #     registry pins a dev build that only exists in Dynatrace's PRIVATE ECR
+    #     (needs AWS creds the codespace lacks) — the root cause of the long
+    #     ISI-7547 ActiveGate ImagePullBackOff saga; and
+    #   * live/prod tenants, since public ECR hosts GA images for every tenant.
+    # The pinned image is multi-arch (amd64 + arm64 — covers Apple-Silicon,
+    # ISI-7049) and anonymously pullable (no pull-secret). Bump / override the
+    # tag with DT_ACTIVEGATE_IMAGE_TAG. See README §"Live vs dev/sprint tenant
+    # registry" for how to confirm a newer GA tag on the public registry.
+    image: public.ecr.aws/dynatrace/dynatrace-activegate:${DT_ACTIVEGATE_IMAGE_TAG}
     capabilities:
       - kubernetes-monitoring
     # Keep the ActiveGate inside a 4-core / 8 GB codespace budget (reference sizing).

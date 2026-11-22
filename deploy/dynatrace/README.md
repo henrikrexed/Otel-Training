@@ -195,83 +195,76 @@ deploy/dynatrace/
 └── uninstall.sh          # ordered teardown
 ```
 
-## Live vs dev/sprint tenant registry (ActiveGate image source)
+## ActiveGate image source — explicit public-ECR pin (ISI-7547)
 
-The ActiveGate image can be pulled from two places, and **which one works depends
-on the tenant class**:
+The DynaKube **pins** the ActiveGate image to a GA build on the **anonymous public
+registry** rather than letting the operator resolve it from the tenant registry:
 
-| Tenant class | apiUrl host | Tenant registry hosts the AG image? | `use-public-registry` |
-|--------------|-------------|-------------------------------------|-----------------------|
-| **Live / prod** | `<env>.live.dynatrace.com` | **Yes** — the proven reference path | `false` (default) |
-| **Dev / sprint** | `*.dev.dynatracelabs.com`, `*.sprint.dynatracelabs.com` | **No** — pull 404s regardless of token | `true` (required) |
-
-A **dev/sprint** tenant (the codespace points at `oat05854.dev.dynatracelabs.com`)
-runs an internal tenant registry that **does not serve the ActiveGate image**, so
-the AG pull returns `NotFound`/`ErrImagePull` **no matter the token type** — the
-board confirmed it still failed with *both* tokens swapped to platform (`dt0s16`).
-The fix is to pull the AG from the **public** registry
-(`public.ecr.aws/dynatrace`), which hosts the image for every tenant, via
-`feature.dynatrace.com/use-public-registry: "true"`.
-
-A **live/prod** tenant hosts the AG in its own registry, so the default
-tenant-registry pull works (this is exactly the
-`henrikrexed/dynatrace-AI-Agent-Workshop` reference, which needs no such flag).
-
-**`install.sh` auto-detects the tenant class from the apiUrl host** and renders
-`use-public-registry` accordingly — `"true"` for `*.dev`/`*.sprint`, `"false"`
-(identical in effect to omitting it) for `*.live`. The live path is therefore
-byte-for-byte unchanged. Public ECR also serves live tenants, so you can force
-the behaviour either way:
-
-```bash
-DT_USE_PUBLIC_REGISTRY=true  bash deploy/dynatrace/install.sh   # force public ECR
-DT_USE_PUBLIC_REGISTRY=false bash deploy/dynatrace/install.sh   # force tenant registry
+```yaml
+spec:
+  activeGate:
+    image: public.ecr.aws/dynatrace/dynatrace-activegate:${DT_ACTIVEGATE_IMAGE_TAG}
 ```
 
-> **Both levers are required for a dev tenant:** a platform token (`dt0s16`) **and**
-> public registry. The ISI-7673 classic-token fail-fast is still correct (a classic
-> `dt0c01` token 404s the *live* tenant registry), but it was **not** the dev-tenant
-> fix — platform tokens alone do not make a dev-tenant registry serve the image.
+`install.sh` renders `${DT_ACTIVEGATE_IMAGE_TAG}` (default a verified GA tag). **An
+explicit `spec.activeGate.image` takes precedence over the operator's registry
+resolution**, so it works on every tenant class with no `use-public-registry`
+annotation and no tenant-class branching.
+
+**Why the pin, not `use-public-registry`:** the codespace points at an internal
+**dev/sprint** tenant (`oat05854.dev.dynatracelabs.com`) that pins a **dev
+ActiveGate build** which exists only in Dynatrace's **private ECR**
+(`478983378254.dkr.ecr.us-east-1.amazonaws.com`, needs AWS creds the codespace
+lacks). `use-public-registry` did **not** help — the operator still *resolved* that
+private dev-build ref and the pull failed with `ErrImagePull: no basic auth
+credentials`, even with **both** tokens on platform (`dt0s16`). Only **GA** builds
+are published to the anonymous public registry; dev builds are not. Pinning an
+explicit GA image bypasses resolution entirely. A live/prod tenant works too, since
+public ECR hosts GA images for every tenant (this matches the
+`henrikrexed/dynatrace-AI-Agent-Workshop` pattern, which also pins a public image).
+
+**Bump / override the tag** with `DT_ACTIVEGATE_IMAGE_TAG`; confirm available GA
+tags on the public registry anonymously:
+
+```bash
+T=$(curl -s 'https://public.ecr.aws/token/?scope=repository:dynatrace/dynatrace-activegate:pull' | sed 's/.*"token":"//;s/".*//')
+curl -s -H "Authorization: Bearer $T" https://public.ecr.aws/v2/dynatrace/dynatrace-activegate/tags/list
+# then:
+DT_ACTIVEGATE_IMAGE_TAG=<newer-GA-tag> bash deploy/dynatrace/install.sh
+```
+
+> The ISI-7673 classic-token fail-fast still applies: a classic `dt0c01` operator
+> token breaks the Kubernetes-monitoring **API** connection (the operator needs the
+> `fleet-management:activegate.*` scopes), independently of the image pin. Use a
+> `dt0s16` platform token.
 
 ## Troubleshooting
 
-- **`<name>-activegate-0` stuck in `Init:ImagePullBackOff`** (ISI-7565). The
-  ActiveGate pod (both its init and main container use the same AG image) pulls
-  from the **per-tenant** registry (`<env>.live.dynatrace.com/linux/...`) using a
-  pull-secret the operator synthesises from the DynaKube `apiToken`. This works —
-  it is exactly how the proven reference deployment
-  (`henrikrexed/dynatrace-AI-Agent-Workshop`) stands the AG up — **provided the
-  operator token carries the ActiveGate + container-image scopes** listed above
-  (`fleet-management:activegate.tokens:create`,
-  `fleet-management:activegate.connection-info:read`,
-  `fleet-management:container-images:read`). If those scopes are missing, the
-  operator cannot mint the pull-secret and the AG image pull fails 401/403.
-  **History (now reconciled — ISI-7674):** ISI-7553 added
-  `feature.dynatrace.com/use-public-registry: "true"`; ISI-7565 **removed** it to
-  match the live-tenant reference. We now know `use-public-registry` was the
-  **correct** lever for a dev/sprint tenant all along — it only appeared to "fail"
-  in ISI-7553 because it was tested with classic tokens and an un-rolled pod, and
-  it was unnecessary on the reference because that reference runs on a **live**
-  tenant whose registry already hosts the image. `install.sh` now renders the flag
-  **tenant-aware** (ON for dev/sprint, OFF for live) — see *Live vs dev/sprint
-  tenant registry* above. On a dev tenant you need BOTH platform tokens and public
-  registry.
-  **Diagnose a live pod** — `install.sh` prints this automatically on failure, or
+- **`<name>-activegate-0` `ErrImagePull` / `ImagePullBackOff` pulling from a
+  `…dkr.ecr.…amazonaws.com` or `*.dev`/`*.sprint.dynatracelabs.com` host**
+  (ISI-7547) — the pull host is a **private Dynatrace ECR / dev-tenant registry**,
+  which means the **explicit public-ECR pin is not in effect** and the operator
+  resolved a private dev build the codespace cannot authenticate to
+  (`no basic auth credentials`). Fix: ensure `spec.activeGate.image` is pinned to
+  `public.ecr.aws/dynatrace/dynatrace-activegate:${DT_ACTIVEGATE_IMAGE_TAG}` and
+  re-run `install.sh` (it restarts a wedged AG StatefulSet). See *ActiveGate image
+  source* above. **History:** ISI-7553 added `use-public-registry`, ISI-7565
+  removed it, ISI-7674 re-added it tenant-aware — but `use-public-registry` only
+  asks the operator to *resolve* the image, and for a dev tenant it resolves the
+  private dev build. The explicit pin is what finally fixed it.
+
+- **`<name>-activegate-0` 404 / `NotFound` pulling
+  `public.ecr.aws/dynatrace/dynatrace-activegate:<tag>`** — the pinned GA tag is
+  not published for this architecture (or was mistyped). Pick another GA tag from
+  the public `tags/list` (see *ActiveGate image source* above) and re-run with
+  `DT_ACTIVEGATE_IMAGE_TAG=<tag> bash deploy/dynatrace/install.sh`; capture
+  `uname -m` to confirm the arch.
+  **Diagnose any AG pod** — `install.sh` prints this automatically on failure, or
   run it by hand:
   `kubectl -n dynatrace describe pod <name>-activegate-0 | sed -n '/Init Containers/,/Conditions/p'`
   and `kubectl -n dynatrace get dynakube <name> -o jsonpath='{.status.conditions}'`.
-  A `ScopeMissing` condition or a `401/403` pull error ⇒ fix the token scopes;
-  `manifest unknown` ⇒ arch/tag; `timeout`/`dial` ⇒ egress to the tenant registry.
-
-- **`<name>-activegate-0` 404 / `NotFound` pulling `…dev.dynatracelabs.com/…activegate…
-  not found`** (ISI-7674) — the **dev/sprint-tenant** case. The image host is a
-  `*.dev.dynatracelabs.com` / `*.sprint.dynatracelabs.com` registry, which **does
-  not host the AG image at all**, so the pull 404s **regardless of token type**
-  (confirmed with platform tokens). This is *not* a scope problem. Fix: pull from
-  the **public** registry — `install.sh` auto-enables this for dev/sprint tenants,
-  so a 404 here means it was forced off; re-run with
-  `DT_USE_PUBLIC_REGISTRY=true bash deploy/dynatrace/install.sh` (and keep platform
-  tokens). See *Live vs dev/sprint tenant registry* above.
+  A `ScopeMissing` condition or `401/403` ⇒ fix the operator token scopes;
+  `manifest unknown`/`404` on `public.ecr.aws` ⇒ arch/tag; `timeout`/`dial` ⇒ egress.
 
 - **`<name>-activegate-0` 404 / `NotFound` pulling `…/linux/activegate:<ver>-raw …
   not found`** (ISI-7673) — the **live-tenant** case. Distinct from the 401/403

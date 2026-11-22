@@ -125,42 +125,32 @@ else
 fi
 export DT_API_URL
 
-# --- 1b. Tenant-aware ActiveGate image source (ISI-7674) -------------------
-# A DEV/sprint tenant (*.dev.dynatracelabs.com, *.sprint.dynatracelabs.com) runs
-# an internal tenant registry that does NOT serve the ActiveGate image, so the AG
-# pull 404s regardless of token type (the board confirmed ErrImagePull with BOTH
-# tokens swapped to platform dt0s16). For those tenants we must pull the AG from
-# the PUBLIC registry (public.ecr.aws/dynatrace), which hosts it for every tenant,
-# via feature.dynatrace.com/use-public-registry. A LIVE/prod tenant
-# (*.live.dynatrace.com) hosts the AG in its own tenant registry — the proven
-# reference path — so we leave the flag "false" (== the operator's default), which
-# keeps that path byte-for-byte identical. Public ECR also works for live tenants,
-# so an operator can force it on. Auto-detect from the apiUrl host; override by
-# exporting DT_USE_PUBLIC_REGISTRY=true|false before running.
-detect_public_registry() {
-  case "$DT_API_URL" in
-    *.dev.dynatracelabs.com*|*.sprint.dynatracelabs.com*) echo "true" ;;
-    *) echo "false" ;;
-  esac
-}
-DT_USE_PUBLIC_REGISTRY="${DT_USE_PUBLIC_REGISTRY:-$(detect_public_registry)}"
-# Normalise to a strict "true"/"false" so the rendered annotation is always valid.
-case "$DT_USE_PUBLIC_REGISTRY" in
-  true|TRUE|1|yes)  DT_USE_PUBLIC_REGISTRY="true" ;;
-  false|FALSE|0|no) DT_USE_PUBLIC_REGISTRY="false" ;;
-  *) err "DT_USE_PUBLIC_REGISTRY must be true/false (got '$DT_USE_PUBLIC_REGISTRY')"; exit 1 ;;
-esac
-export DT_USE_PUBLIC_REGISTRY
+# --- 1b. ActiveGate image pin (ISI-7547) -----------------------------------
+# Pin the ActiveGate image to a GA build on the ANONYMOUS public registry
+# (public.ecr.aws/dynatrace/dynatrace-activegate) and render it into the DynaKube
+# as spec.activeGate.image. An explicit image takes precedence over the operator's
+# registry resolution, so it works on EVERY tenant class and ends the long
+# ISI-7547 ImagePullBackOff saga:
+#   * DEV/sprint tenants (*.dev.dynatracelabs.com, *.sprint.dynatracelabs.com) pin
+#     a dev ActiveGate build that only exists in Dynatrace's PRIVATE ECR
+#     (478983378254.dkr.ecr.us-east-1.amazonaws.com — needs AWS creds the codespace
+#     lacks). `use-public-registry` did NOT help: the operator still resolved that
+#     private dev-build ref → `ErrImagePull: no basic auth credentials`.
+#   * LIVE/prod tenants work too, since public ECR hosts GA images for all tenants.
+# The default below is a GA tag verified on the public registry (HTTP 200,
+# multi-arch amd64+arm64 — covers Apple-Silicon ISI-7049, anonymous pull). When a
+# newer GA ships, bump it (or override DT_ACTIVEGATE_IMAGE_TAG). Confirm available
+# tags anonymously:
+#   T=$(curl -s 'https://public.ecr.aws/token/?scope=repository:dynatrace/dynatrace-activegate:pull' | sed 's/.*"token":"//;s/".*//')
+#   curl -s -H "Authorization: Bearer $T" https://public.ecr.aws/v2/dynatrace/dynatrace-activegate/tags/list
+DT_ACTIVEGATE_IMAGE_TAG="${DT_ACTIVEGATE_IMAGE_TAG:-1.349.93.20261118-200701}"
+export DT_ACTIVEGATE_IMAGE_TAG
 
 log "tenant apiUrl : $DT_API_URL"
 log "namespace     : $DT_NAMESPACE"
 log "dynakube name : $DYNAKUBE_NAME"
 log "operator      : $DT_OPERATOR_CHART @ $DT_OPERATOR_VERSION"
-if [ "$DT_USE_PUBLIC_REGISTRY" = "true" ]; then
-  log "AG image src  : PUBLIC registry (public.ecr.aws/dynatrace) — dev/sprint tenant or forced on"
-else
-  log "AG image src  : tenant registry (default) — live tenant / reference path"
-fi
+log "AG image      : public.ecr.aws/dynatrace/dynatrace-activegate:$DT_ACTIVEGATE_IMAGE_TAG (pinned GA, anonymous)"
 
 # --- 2. Namespace ----------------------------------------------------------
 kubectl get namespace "$DT_NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$DT_NAMESPACE"
@@ -191,11 +181,11 @@ log "rendering + applying DynaKube"
 # not installed in the image, so there is no hard dependency on envsubst.
 render_dynakube() {
   if command -v envsubst >/dev/null 2>&1; then
-    envsubst '${DYNAKUBE_NAME} ${DT_API_URL} ${DT_USE_PUBLIC_REGISTRY}' < "$SCRIPT_DIR/dynakube.yaml"
+    envsubst '${DYNAKUBE_NAME} ${DT_API_URL} ${DT_ACTIVEGATE_IMAGE_TAG}' < "$SCRIPT_DIR/dynakube.yaml"
   else
     sed -e "s|\${DYNAKUBE_NAME}|${DYNAKUBE_NAME}|g" \
         -e "s|\${DT_API_URL}|${DT_API_URL}|g" \
-        -e "s|\${DT_USE_PUBLIC_REGISTRY}|${DT_USE_PUBLIC_REGISTRY}|g" \
+        -e "s|\${DT_ACTIVEGATE_IMAGE_TAG}|${DT_ACTIVEGATE_IMAGE_TAG}|g" \
         "$SCRIPT_DIR/dynakube.yaml"
   fi
 }
@@ -244,19 +234,18 @@ ag_diag() {
   # distinct from a genuine manifest-arch NotFound (wrong tag for this arch),
   # which usually targets a PUBLIC registry (public.ecr.aws / docker.io) instead.
   if echo "$wait_msg" | grep -qiE 'not ?found|manifest unknown|404'; then
-    if echo "$wait_msg" | grep -qiE '\.dev\.dynatracelabs\.com|\.sprint\.dynatracelabs\.com'; then
-      # ISI-7674: a 404 whose image host is a DEV/sprint tenant registry means that
-      # registry simply does not SERVE the AG image (token type is irrelevant — the
-      # board confirmed it 404s with platform tokens too). The fix is to pull the AG
-      # from the public registry, which install.sh now does automatically for these
-      # tenants — so reaching here means use-public-registry is OFF/overridden.
-      echo "  >>> DIAGNOSIS: 404 (NotFound) pulling the ActiveGate image from a DEV/SPRINT" >&2
-      echo "      tenant registry (*.dev/*.sprint.dynatracelabs.com). That registry does NOT" >&2
-      echo "      host the AG image, so the pull 404s regardless of token type (ISI-7674)." >&2
-      echo "      current DT_USE_PUBLIC_REGISTRY=${DT_USE_PUBLIC_REGISTRY:-unset}." >&2
-      echo "      Fix: pull the AG from the PUBLIC registry — export DT_USE_PUBLIC_REGISTRY=true" >&2
-      echo "      and re-run install.sh (auto-detected ON for dev/sprint tenants; this 404" >&2
-      echo "      means it was forced OFF). Platform tokens (dt0s16) are ALSO required." >&2
+    if echo "$wait_msg" | grep -qiE 'dkr\.ecr\..*\.amazonaws\.com|\.dev\.dynatracelabs\.com|\.sprint\.dynatracelabs\.com'; then
+      # ISI-7547: the image host is a PRIVATE Dynatrace ECR (…dkr.ecr.…amazonaws.com)
+      # or a dev/sprint tenant registry — i.e. the explicit public-ECR pin is NOT in
+      # effect and the operator resolved a private dev build the codespace can't pull.
+      echo "  >>> DIAGNOSIS: AG image is NOT the pinned public-ECR GA image. The host above is a" >&2
+      echo "      private Dynatrace ECR / dev-tenant registry, so the operator resolved a dev" >&2
+      echo "      build that is not anonymously pullable (ISI-7547)." >&2
+      echo "      Fix: ensure spec.activeGate.image is pinned to" >&2
+      echo "      public.ecr.aws/dynatrace/dynatrace-activegate:\${DT_ACTIVEGATE_IMAGE_TAG}" >&2
+      echo "      (current DT_ACTIVEGATE_IMAGE_TAG=${DT_ACTIVEGATE_IMAGE_TAG:-unset}); re-run install.sh." >&2
+      echo "      If the pinned tag itself 404s, it is not published for this arch — pick another" >&2
+      echo "      GA tag from: curl -s -H \"Authorization: Bearer \$(curl -s 'https://public.ecr.aws/token/?scope=repository:dynatrace/dynatrace-activegate:pull' | sed 's/.*\"token\":\"//;s/\".*//')\" https://public.ecr.aws/v2/dynatrace/dynatrace-activegate/tags/list" >&2
     elif echo "$wait_msg" | grep -qiE 'dynatracelabs\.com|live\.dynatrace\.com'; then
       echo "  >>> DIAGNOSIS: 404 (NotFound) pulling the ActiveGate image from the LIVE TENANT" >&2
       echo "      registry. A live tenant returns 404 to an UNAUTHORIZED pull — the operator" >&2
@@ -292,21 +281,20 @@ done
 kubectl -n "$DT_NAMESPACE" rollout status statefulset "$AG_STS" --timeout=240s || {
   err "ActiveGate not ready. Capturing ground-truth diagnostic:"
   ag_diag
-  err "Reading the diagnostic above (AG pulls from the TENANT registry by default):"
-  err "  * DynaKube condition ScopeMissing / 401/403 pull error -> the operator apiToken"
-  err "                           lacks the ActiveGate scopes, so the operator cannot mint the"
-  err "                           tenant-registry pull-secret. Fix the DT_OPERATOR_TOKEN scopes"
-  err "                           (fleet-management:activegate.tokens:create + connection-info:read)"
-  err "                           — see deploy/dynatrace/README.md token scopes."
-  err "  * 404 / NotFound on a     -> that dev/sprint tenant registry does NOT host the AG image"
-  err "    *.dev / *.sprint            (token type irrelevant). Pull from the PUBLIC registry:"
-  err "    .dynatracelabs.com host     export DT_USE_PUBLIC_REGISTRY=true and re-run (auto-ON for"
-  err "                                dev/sprint; a 404 here means it was forced off). (ISI-7674)"
-  err "  * 404 / NotFound on a     -> operator token is CLASSIC (dt0c01) or a platform token"
-  err "    *.live.dynatrace.com        missing 'fleet-management:container-images:read'. The live"
-  err "    tenant-registry host        tenant registry 404s an unauthorized pull. Use a dt0s16"
-  err "                                platform token with the 3 required scopes (install.sh now"
-  err "                                rejects dt0c01 up front) — see README token scopes. (ISI-7673)"
+  err "Reading the diagnostic above (AG image is PINNED to public.ecr.aws by default):"
+  err "  * image host is a PRIVATE  -> the public-ECR pin is not in effect; the operator resolved"
+  err "    ECR (…dkr.ecr.…amazonaws    a private dev build. Confirm spec.activeGate.image is"
+  err "    .com) or a *.dev/*.sprint   public.ecr.aws/dynatrace/dynatrace-activegate:\${DT_ACTIVEGATE_IMAGE_TAG}"
+  err "    .dynatracelabs.com host     and re-run install.sh. (ISI-7547)"
+  err "  * 404 / NotFound on        -> the pinned GA tag is not published for this arch. Pick"
+  err "    public.ecr.aws              another DT_ACTIVEGATE_IMAGE_TAG from the public tags/list"
+  err "                                (see the AG image pin comment) and re-run. Capture 'uname -m'."
+  err "  * DynaKube condition ScopeMissing / 401/403 -> the operator apiToken lacks the ActiveGate"
+  err "                           scopes used for the Kubernetes-monitoring connection. Fix the"
+  err "                           DT_OPERATOR_TOKEN scopes (fleet-management:activegate.tokens:create +"
+  err "                           connection-info:read) — see deploy/dynatrace/README.md token scopes."
+  err "  * classic (dt0c01) token   -> install.sh rejects it up front; use a dt0s16 platform token"
+  err "                                with the 3 required scopes — see README token scopes. (ISI-7673)"
   err "  * manifest-not-found on   -> AG image tag missing for this arch; capture 'uname -m'."
   err "    a PUBLIC registry"
   err "  * timeout / dial error   -> egress to the tenant registry blocked."

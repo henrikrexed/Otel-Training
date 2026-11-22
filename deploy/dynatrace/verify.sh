@@ -90,31 +90,25 @@ case "$_op_tok" in
     ;;
 esac
 
-# Tenant-aware ActiveGate image source (ISI-7674). A dev/sprint tenant registry
-# does NOT serve the AG image, so the DynaKube MUST carry
-# feature.dynatrace.com/use-public-registry=true or the AG pull 404s regardless of
-# token type. Derive the tenant host from the live DynaKube apiUrl (falls back to
-# DT_TENANT), then assert the flag matches the tenant class.
-_dk_apiurl=$(kubectl -n "$DT_NAMESPACE" get dynakube "$DYNAKUBE_NAME" \
-  -o jsonpath='{.spec.apiUrl}' 2>/dev/null || true)
-_tenant_host="${_dk_apiurl:-${DT_TENANT:-}}"
-case "$_tenant_host" in
-  *.dev.dynatracelabs.com*|*.sprint.dynatracelabs.com*)
-    _pubreg=$(kubectl -n "$DT_NAMESPACE" get dynakube "$DYNAKUBE_NAME" \
-      -o jsonpath='{.metadata.annotations.feature\.dynatrace\.com/use-public-registry}' 2>/dev/null || true)
-    if [ "$_pubreg" = "true" ]; then
-      pass "dev/sprint tenant + use-public-registry=true (AG pulls from public.ecr.aws)"
-    else
-      fail "dev/sprint tenant but use-public-registry='${_pubreg:-unset}' — that registry does"
-      info "NOT host the AG image, so the pull 404s regardless of token type (ISI-7674). Re-run"
-      info "with DT_USE_PUBLIC_REGISTRY=true bash deploy/dynatrace/install.sh."
-    fi
-    ;;
-  *.live.dynatrace.com*)
-    info "live tenant — AG pulls from the tenant registry (public-registry flag not required)"
+# ActiveGate image pin (ISI-7547). The DynaKube MUST carry an explicit
+# spec.activeGate.image on the ANONYMOUS public registry. Without it the operator
+# resolves the AG image itself, and on a dev/sprint tenant that resolves to a dev
+# build in Dynatrace's PRIVATE ECR (478983378254.dkr.ecr…) -> ErrImagePull. An
+# explicit public-ECR pin works on every tenant class, so assert it unconditionally.
+_ag_image=$(kubectl -n "$DT_NAMESPACE" get dynakube "$DYNAKUBE_NAME" \
+  -o jsonpath='{.spec.activeGate.image}' 2>/dev/null || true)
+case "$_ag_image" in
+  public.ecr.aws/dynatrace/dynatrace-activegate:*)
+    pass "ActiveGate image pinned to public ECR: ${_ag_image##*/}"
     ;;
   "")
-    : # tenant host unknown in this shell; skip
+    fail "DynaKube has no spec.activeGate.image pin — the operator will resolve the AG"
+    info "image itself, which on a dev/sprint tenant is a PRIVATE-ECR dev build (ErrImagePull)."
+    info "Re-run: bash deploy/dynatrace/install.sh (pins public.ecr.aws, ISI-7547)."
+    ;;
+  *)
+    info "ActiveGate image pinned to a non-public-ECR ref ('$_ag_image') — intentional only if"
+    info "you supplied a reachable custom registry + pull-secret; otherwise expect ImagePullBackOff."
     ;;
 esac
 
