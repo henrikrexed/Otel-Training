@@ -55,7 +55,7 @@ Every errored call is a **bet that never settled**, so this error budget is
 denominated in *lost bets* — the SLO speaks the business's language. A platform
 SLO accepts **exactly one** of `customSli` or `sliReference`; this uses
 `customSli`. `dtctl` authenticates with the platform token already in your
-codespace (ISI-7175) — no extra secret.
+codespace — no extra secret.
 
 ## ③ Drive opencode — the prompt ladder
 

@@ -48,7 +48,7 @@ define purpose → explore the data → validate DQL → construct the JSON → 
 | RED — p90 duration | `timeseries percentile(casino.red.duration, 90), by:{span.name}` | B1 spanmetrics |
 
 `dtctl` authenticates with the platform token already in your codespace
-(ISI-7175) — no extra secret.
+— no extra secret.
 
 ## ③ Drive opencode — the prompt ladder
 

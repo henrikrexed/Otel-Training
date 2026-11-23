@@ -1,5 +1,5 @@
 /*
- * Mermaid diagram zoom / lightbox (ISI-7632, addresses #59).
+ * Mermaid diagram zoom / lightbox (addresses #59).
  *
  * Makes every rendered Mermaid diagram clickable-to-enlarge, site-wide, with
  * no dependency and — crucially — WITHOUT an `extra_javascript:` entry in

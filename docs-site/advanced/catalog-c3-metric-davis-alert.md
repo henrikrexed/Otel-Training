@@ -45,7 +45,7 @@ the good/total *ratio* is what the C2 error budget already tracks.
 | `eventTemplate.eventType` | `ERROR` | raises an error-class Davis problem |
 
 `dtctl` authenticates with the platform token already in your codespace
-(ISI-7175) — no extra secret.
+— no extra secret.
 
 !!! note "Validate the selector before you apply (C1 discipline)"
     Confirm the selector returns data (`dtctl query` / Data Explorer) and the

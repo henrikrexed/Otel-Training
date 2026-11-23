@@ -1,5 +1,5 @@
 /*
- * Mermaid diagram zoom / lightbox styling (ISI-7632, addresses #59).
+ * Mermaid diagram zoom / lightbox styling (addresses #59).
  * Paired with docs-site/javascripts/mermaid-zoom.js, wired in via the
  * theme.custom_dir override (overrides/main.html) — not extra_css/extra_javascript.
  */
