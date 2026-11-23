@@ -1,0 +1,19 @@
+{#-
+  Theme override (ISI-7632, addresses #59): wire the Mermaid zoom / lightbox
+  assets into every page WITHOUT using `extra_javascript:`. mkdocs-mermaid2
+  1.2.x treats any `extra_javascript` entry whose basename contains "mermaid"
+  as the library override and then skips loading the real runtime, so the
+  diagrams would silently fail. Injecting the <link>/<script> through this
+  custom_dir template keeps them invisible to the mermaid2 plugin's scan.
+-#}
+{% extends "base.html" %}
+
+{% block styles %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ 'stylesheets/mermaid-zoom.css' | url }}">
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ 'javascripts/mermaid-zoom.js' | url }}"></script>
+{% endblock %}

@@ -7,10 +7,12 @@ Dynatrace-solution GitLab, and a Codespace starting against that fork. Budget
 !!! info "This is the advanced self-paced track"
     These pages sit **alongside** the facilitator-led modules M0–M5, not in
     place of them. Where M0–M5 walk one planted defect at a time with a helper
-    in the room, this track is a self-paced sequence of six larger exercises —
-    instrumentation, a semantic-convention guard, cost, cardinality, PII, and
-    sampling. Each step is step-by-step and ends with a Dynatrace validation
-    checkpoint you run yourself.
+    in the room, this track is a self-paced sequence of seven larger exercises
+    (plus a Step 0 warmup) — instrumentation, business metrics, a
+    semantic-convention guard, cost, cardinality, PII, and sampling. Every step
+    follows one pattern — the **Problem → Opencode → Verify** loop, where you
+    drive the `opencode` AI coding agent to produce each fix — and ends with a
+    Dynatrace validation checkpoint you run yourself.
 
 ## 1. Tokens you need
 
@@ -109,8 +111,9 @@ You have not instrumented anything yet, so this checkpoint just proves the plumb
 
 1. `echo $DT_TENANT`, open the URL, and sign in with the credentials from your
    handout.
-2. Go to **Infrastructure → Kubernetes** and confirm a cluster named after your
-   `PARTICIPANT_ID` appears (first appearance can take a few minutes).
+2. Press **Ctrl/Cmd+K**, search "Kubernetes", and open **Clusters**. Confirm a
+   cluster named after your `PARTICIPANT_ID` appears (first appearance can take a
+   few minutes).
 3. Set a filter `k8s.cluster.name` = your `PARTICIPANT_ID` and save the view.
    You will reuse it on every step.
 
@@ -120,6 +123,6 @@ You have not instrumented anything yet, so this checkpoint just proves the plumb
 - [ ] You own a fork `https://<gitlab-host>/<attendee>/casino`
 - [ ] `GITLAB_REPO_URL` and `GITLAB_TOKEN` are set as Codespace secrets
 - [ ] The Codespace is created on `main` and post-create setup finished
-- [ ] Your cluster appears under **Infrastructure → Kubernetes** in Dynatrace
+- [ ] Your cluster appears under **Ctrl/Cmd+K → Kubernetes → Clusters** in Dynatrace
 
 Next: [The environment](environment.md).

@@ -1,0 +1,43 @@
+# Catalog B4 — derive casino.bet.tier with the transform (OTTL) processor.
+#
+# Delta to merge into observability/collectors/gateway.yaml. A numeric bet amount
+# (casino.bet.amount) is a HIGH-cardinality span attribute — every distinct wager
+# is its own value, so it is useless as a metric dimension or a group-by. This
+# transform derives a LOW-cardinality bucket — casino.bet.tier ∈ {low, mid, high,
+# whale} — from that number, in the GATEWAY, with OTTL. "Bucket the number" is the
+# whole lesson: cardinality is the enemy, so collapse the continuous value into a
+# bounded set you can safely slice on.
+#
+# Placement keeps the pipeline invariants intact —
+#   memory_limiter -> k8sattributes -> transform/bet_tier -> otlp_http/dynatrace (exporter batching)
+# memory_limiter stays FIRST (it must sit ahead of anything that fans out work)
+# and there is NO batch processor — batching happens on the exporter
+# (sending_queue.batch), so the transform runs LAST, right after k8sattributes.
+# Only the TRACES pipeline changes; metrics and logs are untouched.
+
+processors:
+  # transform processor (OTTL). Each statement runs top-to-bottom on every span;
+  # the four `where` ranges are mutually exclusive, so exactly one tier is set and
+  # statement order does not matter. error_mode: ignore means a span missing
+  # casino.bet.amount (e.g. a server span that never settled a bet) is skipped,
+  # not errored — it just carries no tier.
+  transform/bet_tier:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          # Double() coerces the numeric attribute whether the SDK emitted it as
+          # an int or a double, so the comparisons are temporality-proof.
+          - set(attributes["casino.bet.tier"], "low")   where attributes["casino.bet.amount"] != nil and Double(attributes["casino.bet.amount"]) < 10
+          - set(attributes["casino.bet.tier"], "mid")   where attributes["casino.bet.amount"] != nil and Double(attributes["casino.bet.amount"]) >= 10 and Double(attributes["casino.bet.amount"]) < 100
+          - set(attributes["casino.bet.tier"], "high")  where attributes["casino.bet.amount"] != nil and Double(attributes["casino.bet.amount"]) >= 100 and Double(attributes["casino.bet.amount"]) < 1000
+          - set(attributes["casino.bet.tier"], "whale") where attributes["casino.bet.amount"] != nil and Double(attributes["casino.bet.amount"]) >= 1000
+
+# Wire the transform onto the traces pipeline, last — right after k8sattributes.
+# (Only the traces pipeline changes; metrics/logs are untouched.)
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, transform/bet_tier]
+      exporters: [otlp_http/dynatrace]

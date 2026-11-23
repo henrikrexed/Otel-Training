@@ -61,4 +61,44 @@ kubectl -n observability get otelcol                                    # collec
 Export errors → tenant/token/endpoint. SDK startup errors → your M2 file.
 Neither → the workload probably never emitted; go back to the manifest.
 
+### Reading the collector log — what is actually a failure
+
+The gateway exporter retries transiently, so the log is **noisy by design**. Do
+not treat every scary-looking line as broken:
+
+| Log line | Verdict | Why |
+|---|---|---|
+| `Exporting failed. Will retry.` / `Will retry the request after interval` | **Benign** | A transient hiccup (backend blip, brief rate-limit). `sending_queue` + `retry_on_failure` buffer and resend — data is not lost. |
+| `Dropping data because sending_queue is full` | **Real failure** | The queue is saturated and data is being discarded. Investigate backpressure (queue size, backend latency, a wrong endpoint). |
+| `Permanent error` / HTTP `4xx` (401/403/404/400) | **Real failure** | The request is rejected and will *not* succeed on retry — a token, tenant, scope, or endpoint-shape problem. |
+
+Quick health gate (no error = exit 0):
+
+```bash
+logs=$(kubectl -n observability logs deploy/otel-gateway-collector --tail=200)
+# A healthy collector drops nothing and gets no 4xx. Transient "Will retry" is OK.
+echo "$logs" | grep -c "Dropping data"                 # must be 0
+echo "$logs" | grep -Ec '"code": 4[0-9][0-9]|status(Code)?[ ="]+4[0-9][0-9]'   # must be 0
+```
+
+If both counts are `0`, the exporter is healthy even if you see `Will retry` lines.
+
+### `kubectl get otelcol` VERSION says 0.162.0 but the image is 0.164.0
+
+Expected — they measure different things, and this is **not** a problem:
+
+- The **VERSION** column comes from the CR `status.version`, which the
+  OpenTelemetry Operator (`v0.162.0`) fills in from *its own* bundled default
+  collector version. It tracks the operator release line, not your image.
+- The **running image** is pinned explicitly in `spec.image`
+  (`opentelemetry-collector-contrib:0.164.0`), newer than the operator default.
+  The operator honours the pin but does not rewrite `status.version` to match.
+
+Confirm what is actually running (this is the source of truth):
+
+```bash
+kubectl -n observability get deploy otel-gateway-collector \
+  -o jsonpath='{.spec.template.spec.containers[0].image}'   # -> ...contrib:0.164.0
+```
+
 [← Back to M0](setup.md)

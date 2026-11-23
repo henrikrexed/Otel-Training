@@ -7,6 +7,13 @@ site_dir: site
 
 theme:
   name: material
+  # ISI-7632 (#59): clickable-to-enlarge Mermaid diagrams are wired in through a
+  # custom_dir template override (overrides/main.html injects the zoom <link>/
+  # <script>), NOT via extra_javascript. mkdocs-mermaid2 1.2.x treats any
+  # extra_javascript entry whose basename contains "mermaid" as the library
+  # override and then skips the real runtime (diagrams silently fail), so the
+  # override path is the only mermaid2-safe way to add the lightbox.
+  custom_dir: overrides
   palette:
     - scheme: default
       primary: deep purple
@@ -68,16 +75,38 @@ nav:
   - M5 — Operating at scale: module-5.md
   - Troubleshooting: troubleshooting.md
   # Option A (ISI-6913): new advanced self-paced track ALONGSIDE M0–M5.
-  # Pages are stubs pending §2 content authoring (ISI-6930).
+  # Opencode-first rewrite (ISI-7564): Problem → Opencode → Verify loop,
+  # Step 0 warmup + Step 2 business metrics, steps renumbered.
   - Advanced self-paced track:
       - Getting started: advanced/getting-started.md
       - The environment: advanced/environment.md
+      - Step 0 — Warmup: advanced/step-0-warmup.md
       - Step 1 — Instrument with AI agents: advanced/step-1-instrument-with-agents.md
-      - Step 2 — Weaver pipeline: advanced/step-2-weaver-pipeline.md
-      - Step 3 — Cost of observability: advanced/step-3-cost-of-observability.md
-      - Step 4 — High-cardinality metrics: advanced/step-4-high-cardinality.md
-      - Step 5 — PII in logs: advanced/step-5-pii-logs.md
-      - Step 6 — Tail sampling: advanced/step-6-tail-sampling.md
+      - Step 2 — Business metrics: advanced/step-2-business-metrics.md
+      - Step 3 — Weaver pipeline: advanced/step-3-weaver-pipeline.md
+      - Step 4 — Cost of observability: advanced/step-4-cost-of-observability.md
+      - Step 5 — High-cardinality metrics: advanced/step-5-high-cardinality.md
+      - Step 6 — PII in logs: advanced/step-6-pii-logs.md
+      - Step 7 — Tail sampling: advanced/step-7-tail-sampling.md
+      - 'Appendix — Central config: OpAMP bridge + BindPlane gateway': advanced/bindplane-opamp.md
+      - 'Appendix — Local CI/CD: Gitea Actions & Packages': advanced/gitea-local-cicd.md
+      - Catalog (extra exercises):
+          - Overview: advanced/catalog.md
+          - "A1 — Fix a broken trace [25m][med]": advanced/catalog-a1-broken-trace.md
+          - "A2 — Log ↔ trace correlation [20m][med]": advanced/catalog-a2-log-trace-correlation.md
+          - "A3 — Multi-language instrumentation [25m][med]": advanced/catalog-a3-multi-language.md
+          - "A4 — Exceptions / span-events [20m][med]": advanced/catalog-a4-exceptions-span-events.md
+          - "A5 — Baggage propagation (player.tier) [25m][med]": advanced/catalog-a5-baggage-propagation.md
+          - "B1 — RED metrics from spans [20m][med]": advanced/catalog-b1-spanmetrics.md
+          - "B2 — Cost-center tagging [20m][med]": advanced/catalog-b2-cost-center.md
+          - "B3 — Drop noise (filter) [15m][easy]": advanced/catalog-b3-filter-drop-noise.md
+          - "B4 — OTTL enrichment (bet.tier) [20m][med]": advanced/catalog-b4-ottl-enrichment.md
+          - "B5 — Structure logs (OTTL) [25m][med]": advanced/catalog-b5-ottl-log-structuring.md
+          - "B6 — Metric temporality (delta) [20m][med]": advanced/catalog-b6-cumulativetodelta.md
+          - "C1 — Dashboard via dtctl [20m][med]": advanced/catalog-c1-dtctl-dashboard.md
+          - "C2 — Reliability SLO via dtctl [20m][med]": advanced/catalog-c2-slo.md
+          - "C3 — Metric event / Davis alert [20m][med]": advanced/catalog-c3-metric-davis-alert.md
+          - "C4 — Dynatrace cost centers [20m][med]": advanced/catalog-c4-dynatrace-cost-center.md
 
 plugins:
   - search

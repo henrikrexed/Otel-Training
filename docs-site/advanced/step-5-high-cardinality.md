@@ -1,4 +1,6 @@
-# Step 4 — High-cardinality metrics
+# Step 5 — High-cardinality metrics
+
+_The `labs/advanced/` directories keep their original feature-ordinal numbering, so they run one behind these doc steps — this page's assets live under `labs/advanced/step4-high-cardinality/`._
 
 **Goal:** find a metric whose cost is exploding, understand why, and fix it at the
 collector without an app redeploy. Budget 25 minutes.
@@ -23,14 +25,34 @@ flowchart LR
 `labs/advanced/step4-high-cardinality/before.offending-metric.md`). Every distinct
 round and player is a new series, so the series count grows without bound.
 
-## The fix — strip the dimensions at the gateway
+## ② Opencode — strip the dimensions at the gateway
 
-Apply the `transform/cardinality` processor
-(`labs/advanced/step4-high-cardinality/cardinality-fix-processor.yaml`), wired into
-the metrics pipeline in the composed gateway:
+Drive `opencode` at the gateway with the `otel-ottl` skill — stripping metric
+labels is an OTTL transform, so name that skill explicitly:
 
 ```bash
-kubectl apply -f labs/advanced/gateway-advanced.yaml
+opencode run "Using the otel-ottl and otel-collector skills: in \
+observability/collectors/gateway.yaml add a transform/cardinality processor that \
+deletes the metric datapoint attributes round.id and player.id (OTTL: \
+delete_key(attributes, \"round.id\")). Wire it into the metrics pipeline only, \
+after k8sattributes and before the exporter. Leave memory_limiter first and no batch processor."
+```
+
+## ③ Review — read the diff
+
+Confirm it uses OTTL `delete_key` on the two offending attributes, sits in the
+**metrics** pipeline (not traces/logs), and respects first/last. Reference
+answer: `labs/advanced/step4-high-cardinality/cardinality-fix-processor.yaml`.
+
+!!! warning "If the agent gets it wrong — steer it back"
+    If it strips the wrong keys or adds the processor to every pipeline, reply
+    *"only the metrics pipeline, and only delete round.id and player.id — keep
+    casino.game.name and casino.outcome."*
+
+## ④ Apply — kubectl
+
+```bash
+kubectl apply -f observability/collectors/gateway.yaml
 ```
 
 The gateway strips `round.id` / `player.id` and the counter collapses back to
@@ -68,4 +90,4 @@ Or inspect the dimension cardinality directly in **Metrics → casino.payout.tot
 - [ ] The series count is flat at ~12 after the fix
 - [ ] You can still drill into a single round via the Step 1 spans
 
-Next: [Step 5 — PII in logs](step-5-pii-logs.md).
+Next: [Step 6 — PII in logs](step-6-pii-logs.md).

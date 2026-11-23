@@ -47,7 +47,7 @@ flowchart LR
   games -. "OTLP/gRPC" .-> gw
   scoring -. "OTLP/gRPC" .-> gw
   dash -. "OTLP/gRPC" .-> gw
-  gw["otel-gateway-collector.observability:4317<br/>k8sattributes → cumulativetodelta → batch"] --> dt[("Dynatrace tenant")]
+  gw["otel-gateway-collector.observability:4317<br/>k8sattributes → cumulative_to_delta<br/>(exporter batching)"] --> dt[("Dynatrace tenant")]
 ```
 
 - **kind cluster** in your Codespace, one per attendee

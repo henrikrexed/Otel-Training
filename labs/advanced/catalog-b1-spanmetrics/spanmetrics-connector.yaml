@@ -1,0 +1,52 @@
+# Catalog B1 — RED metrics from spans (spanmetrics connector).
+#
+# This is the DELTA to merge into observability/collectors/gateway.yaml. It adds
+# a `spanmetrics` connector that derives RED metrics (Rate, Errors, Duration)
+# from the trace stream — NO application code change. The connector sits as an
+# EXPORTER on the traces pipeline and a RECEIVER on a new metrics pipeline.
+#
+# RED mapping:
+#   Rate      -> casino.red.calls              (counter, one series per span.name)
+#   Errors    -> casino.red.calls{status.code="STATUS_CODE_ERROR"}
+#   Duration  -> casino.red.duration           (histogram -> p50/p90/max)
+#
+# Invariants still hold: memory_limiter FIRST, NO batch processor (exporter-level batching) on every pipeline.
+
+connectors:
+  spanmetrics:
+    # Derive a request-duration histogram with explicit buckets tuned for the
+    # casino money-path (sub-ms game logic up to multi-second settlement).
+    histogram:
+      explicit:
+        buckets: [1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s]
+    # Keep the dimensions BOUNDED — the same discipline as Step 2 / Step 5.
+    # span.name + status.code give RED; the two casino dims let you slice by game.
+    dimensions:
+      - name: casino.game.name
+      - name: casino.outcome
+    # Prefix the emitted metrics so they are easy to find in Grail.
+    namespace: casino.red
+    exemplars:
+      enabled: true          # link each bucket back to an exemplar trace
+    metrics_flush_interval: 15s
+    # Emit DELTA temporality to match this tenant's convention — the baseline
+    # metrics pipeline runs cumulative_to_delta, but the connector output does NOT
+    # pass through it, so set it here (otherwise casino.red.* ships cumulative).
+    aggregation_temporality: AGGREGATION_TEMPORALITY_DELTA
+
+service:
+  pipelines:
+    # The traces pipeline now ALSO exports to the spanmetrics connector, in
+    # addition to shipping spans to Dynatrace. Order is unchanged; spanmetrics is
+    # just an extra exporter fed the same spans.
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes]
+      exporters: [otlp_http/dynatrace, spanmetrics]
+
+    # A dedicated metrics pipeline consumes the connector output. memory_limiter
+    # first, no batch processor — invariants hold here too (batching is on the exporter).
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      processors: [memory_limiter]
+      exporters: [otlp_http/dynatrace]

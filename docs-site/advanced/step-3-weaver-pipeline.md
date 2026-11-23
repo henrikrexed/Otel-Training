@@ -1,8 +1,17 @@
-# Step 2 — Weaver pipeline
+# Step 3 — Weaver pipeline
 
-**Goal:** stop the attributes you just created in Step 1 from silently rotting.
-You will turn the `casino.*` conventions into a versioned registry and a CI check
-that fails the pull request on drift. Budget 25 minutes.
+_The `labs/advanced/` directories keep their original feature-ordinal numbering, so they run one behind these doc steps — this page's assets live under `labs/advanced/step2-weaver-semconv/`._
+
+!!! info "Optional / stretch step"
+    Weaver is a build-time governance guard, not a telemetry fix. If you are tight
+    on time, skim the concept and move to [Step 4](step-4-cost-of-observability.md) —
+    the money-path is already observable after Steps 1–2. Come back here when you
+    want to stop those attributes from rotting.
+
+**Goal:** stop the attributes you created in Step 1 (and reused for the Step 2
+metrics) from silently rotting. You will turn the `casino.*` conventions into a
+versioned registry and a CI check that fails the pull request on drift. Budget
+25 minutes.
 
 ## The concept
 
@@ -39,15 +48,36 @@ No registry, no CI check. A rename or a stray high-cardinality dimension merges
 freely and Dynatrace content silently rots. This is the status quo you start
 from.
 
-## The fix — add the guard
+## ② Opencode — add the guard
 
-Run the same command CI runs (exit 0 means conventions intact):
+Unlike the collector steps, the fix here is a **registry**, not a pipeline change.
+Drive `opencode` with the `otel-semantic-conventions` skill to author (or extend)
+the registry from the `casino.*` attributes already in the code — goal, target
+dir, skill:
+
+```bash
+opencode run "Using the otel-semantic-conventions skill: review the casino.* \
+attributes and metrics used in the slots service, and make \
+labs/advanced/step2-weaver-semconv/registry a complete Weaver registry covering \
+casino.game.name, casino.bet.amount, casino.outcome, casino.payout.amount and \
+the Step 2 metrics casino.bets.count / casino.wager.amount. Enforce snake/dotted \
+naming and forbid high-cardinality metric dimensions in the rego policy."
+```
+
+Review the diff, then run the same command CI runs (exit 0 means conventions
+intact):
 
 ```bash
 weaver registry check \
   --registry labs/advanced/step2-weaver-semconv/registry \
   --policy   labs/advanced/step2-weaver-semconv/weaver-policies
 ```
+
+!!! tip "If the agent gets it wrong — steer it back"
+    If the agent invents attributes the code does not emit, reply *"only include
+    casino.* keys that actually appear in the slots service source and the Step 2
+    metrics — quote each one."* The committed `registry/models/casino.yaml` is the
+    reference answer.
 
 ### Watch the guard fire
 
@@ -94,4 +124,4 @@ fetch spans
 - [ ] The `weaver-semconv-check` CI job is wired for `services/**`
 - [ ] The Step 1 DQL still returns rows (names held stable)
 
-Next: [Step 3 — Cost of observability](step-3-cost-of-observability.md).
+Next: [Step 4 — Cost of observability](step-4-cost-of-observability.md).

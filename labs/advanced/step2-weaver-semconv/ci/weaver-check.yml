@@ -1,0 +1,49 @@
+# Weaver semantic-convention regression guard (CI check).
+#
+# Copy to .github/workflows/weaver-check.yml in the casino app repo (or keep it here for
+# the training repo). It fails the build when a change drifts from the casino.* conventions
+# defined in labs/advanced/step2-weaver-semconv/registry — the "avoid future regression"
+# outcome of Step 2.
+name: weaver-semconv-check
+
+on:
+  pull_request:
+    paths:
+      - "labs/advanced/step2-weaver-semconv/registry/**"
+      - "services/**"            # casino service source in the app repo
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  weaver-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pin Weaver so the guard is reproducible across attendees (bump deliberately).
+      - name: Run Weaver registry check
+        uses: open-telemetry/weaver@v0.17.1
+        with:
+          registry: labs/advanced/step2-weaver-semconv/registry
+          policies: labs/advanced/step2-weaver-semconv/weaver-policies
+          args: >-
+            registry check
+            --registry labs/advanced/step2-weaver-semconv/registry
+            --policy labs/advanced/step2-weaver-semconv/weaver-policies
+
+  # Fallback for runners without the action: run the pinned Docker image directly.
+  weaver-check-docker:
+    runs-on: ubuntu-latest
+    if: ${{ false }}   # enable if the composite action is unavailable
+    steps:
+      - uses: actions/checkout@v4
+      - name: Weaver (docker)
+        run: |
+          docker run --rm -v "${PWD}:/work" -w /work \
+            otel/weaver:v0.17.1 \
+            registry check \
+              --registry labs/advanced/step2-weaver-semconv/registry \
+              --policy labs/advanced/step2-weaver-semconv/weaver-policies

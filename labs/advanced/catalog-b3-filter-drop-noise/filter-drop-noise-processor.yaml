@@ -1,0 +1,44 @@
+# Catalog B3 — drop noise with the filter processor.
+#
+# Delta to merge into observability/collectors/gateway.yaml. Drops health-check
+# and scrape-noise spans at the GATEWAY — before they are exported —
+# so Dynatrace never ingests (or bills for) telemetry that carries no diagnostic
+# signal. Health probes and /metrics scrapes fire every few seconds on every pod
+# and drown the useful money-path spans.
+#
+# Placement is the whole lesson: the filter runs AFTER enrichment and BEFORE
+# the exporter, so the pipeline invariants still hold —
+#   memory_limiter -> k8sattributes -> filter/drop_noise -> (exporter batching)
+# memory_limiter stays FIRST (it must sit ahead of anything that fans out work)
+# and there is NO batch processor (deprecated; batching is sending_queue.batch).
+
+processors:
+  # filter processor (OTTL). A span is DROPPED when ANY listed condition is
+  # true. error_mode: ignore means a span missing one of these attributes is
+  # evaluated as "condition false" rather than erroring the whole batch.
+  filter/drop_noise:
+    error_mode: ignore
+    traces:
+      span:
+        # Liveness / readiness probes — the http.route is the low-cardinality,
+        # SDK-normalised path, so prefer it when present.
+        - 'attributes["http.route"] == "/health"'
+        - 'attributes["http.route"] == "/healthz"'
+        - 'attributes["http.route"] == "/readyz"'
+        # Prometheus scrape endpoint.
+        - 'attributes["http.route"] == "/metrics"'
+        # Fallback for SDKs that only set url.path (no templated route) — match
+        # the same noise endpoints by raw path.
+        - 'IsMatch(attributes["url.path"], "^/(health|healthz|readyz|metrics)$")'
+        # Drop by prober identity too: kube-probe liveness + Prometheus scrapes
+        # carry a recognisable User-Agent even when the path differs.
+        - 'IsMatch(attributes["user_agent.original"], "^(kube-probe|Prometheus)/.*")'
+
+# Wire the filter onto the traces pipeline after k8sattributes.
+# (Only the traces pipeline changes; metrics/logs are untouched.)
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, filter/drop_noise]
+      exporters: [otlp_http/dynatrace]

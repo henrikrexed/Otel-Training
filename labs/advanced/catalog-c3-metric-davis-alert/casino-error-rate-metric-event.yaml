@@ -1,0 +1,49 @@
+# Catalog C3 — Casino money-path error-rate Davis alert (reference answer).
+#
+# A Settings 2.0 object on schema `builtin:anomaly-detection.metric-events`,
+# scope `environment`. This is the metric-event / Davis alert: Dynatrace samples
+# the metric once per minute and raises a Davis problem when the money-path
+# error count stays ABOVE the threshold for enough samples.
+#
+# This file is the `value` body only. Apply it with the companion
+# dtctl-apply.sh, which passes --schema / --scope. Confirm the exact field set
+# for YOUR tenant's schema version first:
+#   dtctl get settings-schema builtin:anomaly-detection.metric-events
+#
+# metricSelector note: a metric event watches ONE selector, so we alert on the
+# error COUNT per minute (a rate), not a good/total ratio — the ratio is what the
+# C2 SLO error budget already tracks. Validate the selector resolves to data in
+# Data Explorer / `dtctl query` before applying (same "only use metrics that
+# return data" discipline as C1); the transformation suffix may differ by how the
+# OTLP spanmetrics counter is ingested. The status.code error value may be "ERROR"
+# or "STATUS_CODE_ERROR" depending on how the spanmetrics dimension is captured —
+# same caveat as the C2 SLO; confirm against your tenant and adjust.
+enabled: true
+summary: "Casino money-path error rate high"
+queryDefinition:
+  type: METRIC_SELECTOR
+  metricSelector: 'casino.red.calls:filter(and(eq("span.name","casino.slots.spin"),eq("status.code","ERROR"))):splitBy():sum:rollup(avg)'
+modelProperties:
+  type: STATIC_THRESHOLD
+  threshold: 5
+  alertCondition: ABOVE
+  # Do NOT alert when the series simply stops reporting (that is the SLO's job via
+  # no-data handling); here we only care about a real error spike. NB: depending on
+  # the schema version this field may be named `alertOnNoData` in Settings 2.0 vs
+  # `alertingOnMissingData` in the classic Metric-Events v1 API — confirm with
+  # `dtctl get settings-schema builtin:anomaly-detection.metric-events`.
+  alertingOnMissingData: false
+  # Fire on 3 violating minutes out of a 5-minute sliding window; clear after 5
+  # calm minutes. Tunable; small windows make the controlled scenario fire fast.
+  samples: 5
+  violatingSamples: 3
+  dealertingSamples: 5
+eventTemplate:
+  title: "Casino money-path error rate above threshold"
+  description: "The casino.red.calls error count on {dims} was {alert_condition} the threshold of {threshold} errors/min."
+  eventType: ERROR
+  # Fold this event into a single Davis problem rather than one per dimension.
+  davisMerge: true
+# Alert globally (no per-entity split) — the selector already scopes to the
+# money-path span.
+eventEntityDimensionKey: null

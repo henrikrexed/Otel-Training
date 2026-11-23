@@ -2,9 +2,12 @@
 
 **Goal:** make the casino's money-path observable. Auto-instrumentation gives you
 the HTTP and DB edges for free, but the *business logic* — the bet, the RNG draw,
-the payout decision — is a black box. You will use a coding agent to add manual
-spans and domain attributes, then confirm the money-path shows up in Dynatrace.
-Budget 30 minutes.
+the payout decision — is a black box. You will run the **Problem → Opencode →
+Verify** loop from [The environment](environment.md#the-agent-loop-problem-opencode-verify)
+for the first time: see the missing money-path in Dynatrace, drive `opencode`
+(warmed up in [Step 0](step-0-warmup.md)) with the `otel-instrumentation` skill to
+add manual spans and domain attributes, review the diff, commit for Argo CD to
+redeploy, and confirm the span shows up. Budget 30 minutes.
 
 ## The concept
 
@@ -23,69 +26,50 @@ but nothing about *which game*, *the bet size*, *the outcome*, or *the payout*.
 So you cannot answer "are high-value bets losing more often?" or "which game
 drives payout cost?". You add a child span that carries the domain.
 
-## Before — the planted gap
+## ① Problem — the planted gap
 
-The slots service (`vegas-slots-service`, Node.js) wires only the
-auto-instrumentation SDK. Its `/spin` handler computes outcome and payout with
-**no manual span and no domain attributes**. Reference asset:
-`labs/advanced/step1-agent-instrumentation/before.slots-index.js`.
+The slots service (`vegas-slots-service`, Node.js) ships **deliberately
+under-instrumented**. It wires only the auto-instrumentation SDK, so its `/spin`
+handler computes outcome and payout with **no manual span and no domain
+attributes**. In Dynatrace the symptom is stark: a spin is a featureless
+`POST /spin` server span — flat duration, and because the business logic runs
+inside that one handler with no child span, the money-path shows up as an
+**orphaned, undifferentiated** operation with nothing you can slice by. Reference
+asset (the planted state): `labs/advanced/step1-agent-instrumentation/before.slots-index.js`.
 
-Planted gaps:
+Planted gaps you will see and fix:
 
-- No child span around the outcome/payout computation (the variable part).
-- No `casino.*` domain attributes on the server span.
-- Losing-edge errors are swallowed — no span event or error status.
+- **No child span** around the outcome/payout computation — the variable,
+  interesting part of the request is invisible inside the generic server span.
+- **No `casino.*` domain attributes** — you cannot answer "are high-value bets
+  losing more often?" or "which game drives payout cost?".
+- **Losing-edge errors are swallowed** — a settlement failure throws with no span
+  event and no error status, so it never surfaces in trace analysis.
 
-## The fix — drive a coding agent
+Confirm the symptom first — run the checkpoint DQL at the foot of this page now
+and watch it return **zero rows**. That is your "before".
 
-The coding agent for this step is **`opencode`**, baked into the Codespace image
-and wired at start-up to the workshop LLM proxy (see
-[Getting started](getting-started.md#1-tokens-you-need) for the two `WORKSHOP_*`
-secrets). It starts in **build mode**, so it can read and edit files in your
-fork directly. Confirm it is ready:
+## ② Opencode — drive the fix
 
-```bash
-opencode --version
-opencode run "reply with the word READY"   # returns a model completion
-```
-
-### Dynatrace Agent Skills (pre-installed)
-
-The Codespace bootstrap also installs the **Dynatrace-for-AI Agent Skills** so
-`opencode` can reason about Dynatrace data in-context — DQL syntax, observability
-patterns, and Kubernetes/cloud topology (38 `dt-*` skills, pinned to a release).
-No action needed; they are copied into opencode's skills directory during
-start-up. Confirm they loaded:
+You already proved `opencode` and its skills work in
+[Step 0](step-0-warmup.md). Now use it for real. Clone your casino fork, `cd`
+into it, and drive the agent at the slots service source with the
+`otel-instrumentation` skill — the prompt names the **goal**, the **target file**,
+and the **skill**:
 
 ```bash
-bash .devcontainer/bootstrap/verify-opencode-skills.sh   # gate: dt-dql-essentials, dt-obs-kubernetes, …
-opencode debug skill | grep dt-                          # the raw list opencode sees
+opencode run "Using the otel-instrumentation skill: in the vegas-slots-service \
+/spin handler, wrap the draw and payout in a child span 'casino.slots.spin' with \
+@opentelemetry/api. Set attributes casino.game.name, casino.bet.amount, \
+casino.outcome, casino.payout.amount; add a 'jackpot' span event on a jackpot; \
+set span error status on failures. Keep the existing response shape."
 ```
 
-If they are missing (e.g. GitHub was unreachable at bootstrap — the install is
-non-fatal), re-run `bash .devcontainer/bootstrap/install-opencode-skills.sh`.
-On a machine with Node you can install the same skill set directly with
-`npx skills add Dynatrace/dynatrace-for-ai`.
+## ③ Review — read the diff
 
-Clone your casino fork, `cd` into it, and drive `opencode` at the slots service
-source — either interactively (`opencode`, then type the request) or in one
-shot:
-
-```bash
-opencode run "In the vegas-slots-service /spin handler, wrap the draw and payout \
-in a child span 'casino.slots.spin' using @opentelemetry/api. Set attributes \
-casino.game.name, casino.bet.amount, casino.outcome, casino.payout.amount; add a \
-'jackpot' span event on a jackpot; set span error status on failures. Keep the \
-existing response shape."
-```
-
-!!! tip "opencode edits your working tree — review before you commit"
-    In build mode `opencode` writes the change straight into the files. Read the
-    diff it produces, then commit it to your fork so Argo CD redeploys. If the
-    proxy is unreachable or the `WORKSHOP_*` secrets are unset, see
-    [Troubleshooting → Workshop LLM proxy](../troubleshooting.md#workshop-llm-proxy-opencode).
-
-The target shape the agent should converge on (from `after.slots-index.js`):
+In build mode `opencode` writes the change straight into the working tree. **Read
+the diff before you commit.** The target shape the agent should converge on (from
+`after.slots-index.js`):
 
 ```diff
 + const { trace, SpanStatusCode } = require('@opentelemetry/api');
@@ -119,9 +103,25 @@ The target shape the agent should converge on (from `after.slots-index.js`):
 
 !!! tip "Why these exact attribute names?"
     `casino.game.name`, `casino.bet.amount`, `casino.outcome`,
-    `casino.payout.amount`. Step 1 **creates** these attributes; Step 2
-    **guards** them with Weaver. Keep the names exactly as above or the Step 2
-    registry check will flag drift.
+    `casino.payout.amount`. Step 1 **creates** these attributes; [Step 3
+    (Weaver)](step-3-weaver-pipeline.md) **guards** them, and [Step 2](step-2-business-metrics.md)
+    **reuses** `casino.game.name` / `casino.outcome` as the dimensions on the
+    business metrics. Keep the names exactly as above or the Step 3 registry
+    check will flag drift.
+
+!!! warning "If the agent gets it wrong — steer it back"
+    Common misses and the one-line correction to reply with:
+
+    - **Attribute dropped or renamed** (`casino.game` instead of
+      `casino.game.name`): *"use exactly these four keys, dotted:
+      casino.game.name, casino.bet.amount, casino.outcome, casino.payout.amount."*
+    - **No error path**: *"wrap the body in try/catch and set
+      SpanStatusCode.ERROR + recordException on failure."*
+    - **Response shape changed**: *"keep the existing `res.json({ outcome, payout })`
+      response untouched."*
+
+    Re-run `opencode` with the correction rather than hand-editing — the verify
+    checkpoint tells you when the agent is done.
 
 The same pattern applies to roulette/dice/blackjack. The Java `scoring` service
 runs under the OTel Java agent (zero-code), so there you add
@@ -136,10 +136,21 @@ public Payout settleRound(@SpanAttribute("casino.game.name") String game,
 }
 ```
 
-Commit the change to your fork and let Argo CD redeploy the service, then play a
+## ④ Apply — commit → Argo CD sync
+
+The casino namespace is GitOps-owned, so you apply app-code fixes through Git,
+not `kubectl`:
+
+```bash
+git add . && git commit -m "feat(slots): add casino.slots.spin money-path span"
+git push            # to your fork's main
+```
+
+Argo CD syncs within the reconcile interval (hit **Refresh** in the UI at
+`http://localhost:30002` to force it), redeploys the slots service, then play a
 few rounds of slots to generate traffic.
 
-## Dynatrace validation checkpoint
+## ⑤ Verify — Dynatrace validation checkpoint
 
 Run in a Grail **Notebook** against the training tenant (filter to your cluster):
 
@@ -163,4 +174,4 @@ fetch spans
 - [ ] The DQL returns one row per outcome with payout aggregates
 - [ ] The span is a child of `POST /spin` in the trace flow
 
-Next: [Step 2 — Weaver pipeline](step-2-weaver-pipeline.md).
+Next: [Step 2 — Business metrics](step-2-business-metrics.md).

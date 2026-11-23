@@ -1,0 +1,46 @@
+# Catalog C2 — Casino money-path availability SLO (reference answer).
+#
+# Grail-native platform SLO, managed by dtctl as the `slo` resource. The SLO
+# spec allows EXACTLY ONE of `customSli` or `sliReference`; here we use
+# `customSli` with a DQL indicator that returns an `sli` field (an array of
+# doubles) — the availability percentage per evaluation bucket.
+#
+# SLI = good bet-processing requests / total bet-processing requests × 100,
+# computed from the B1 RED metric `casino.red.calls` (which carries the same
+# `casino.*` / `span.name` vocabulary as the Step-2 business metrics, so the SLO
+# speaks the money-path's language). Every errored call is a bet that never
+# settled — so this availability number is the reliability face of the Step-2
+# `casino.bets.count` business signal.
+#
+# Apply with the companion dtctl-apply.sh (validate --dry-run, then apply).
+name: casino-money-path-availability
+description: >-
+  Availability SLO over the casino money-path (slots /spin). SLI = successful
+  bet-processing requests / total bet-processing requests, from the B1 RED
+  metric casino.red.calls. Protects the Step-2 business signal: an errored call
+  is a bet that never settled.
+customSli:
+  # The indicator MUST produce a field named `sli` (array of doubles). Grail DQL:
+  # one timeseries with a total series and a good (non-error) series, then a
+  # computed sli = good/total %. NB: the exact value of status.code captured from
+  # the spanmetrics connector may be "ERROR" or "STATUS_CODE_ERROR" depending on
+  # the tenant — confirm with `dtctl query` / a Notebook before applying and
+  # adjust the filter value if needed (same caveat as labs/advanced/VALIDATION.md).
+  indicator: >-
+    timeseries {
+      total = sum(casino.red.calls),
+      good  = sum(casino.red.calls, filter: { status.code != "ERROR" })
+    },
+    filter: { span.name == "casino.slots.spin" }
+    | fieldsAdd sli = (good[] / total[]) * 100
+criteria:
+  # 7-day rolling window. target = the SLO you commit to (99%); warning = the
+  # earlier "burning fast" line (99.5%), which sits ABOVE target for availability.
+  - timeframeFrom: now-7d
+    timeframeTo: now
+    target: 99.0
+    warning: 99.5
+tags:
+  - casino
+  - money-path
+  - training
