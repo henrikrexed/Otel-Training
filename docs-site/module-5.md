@@ -39,7 +39,7 @@ Enterprise Scale*. Every item maps to something you touched today.
 
 ### Pipeline hygiene
 
-- [ ] **Canonical processor order** — `memory_limiter` first, `batch` last,
+- [ ] **Canonical processor order** — `memory_limiter` first, no `batch` processor,
       enrichment before filtering (M3).
 - [ ] **Cardinality budget** — every metric dimension is a decision; unbounded
       dimensions are rejected at design time or dropped at the control point

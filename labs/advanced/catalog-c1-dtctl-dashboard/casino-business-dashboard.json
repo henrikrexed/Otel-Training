@@ -1,0 +1,55 @@
+{
+  "version": 18,
+  "name": "casino-business-overview",
+  "description": "Vegas Casino business + RED overview (Step-2 metrics + Catalog B1 spanmetrics).",
+  "variables": [],
+  "tiles": {
+    "header": {
+      "type": "markdown",
+      "title": "",
+      "content": "# 🎰 Vegas Casino — Business Overview\n\nBuilt from the Step-2 business metrics (`casino.bets.count`, `casino.wager.amount`) and the Catalog B1 span-derived RED metrics (`casino.red.*`). Deployed with `dtctl` — see the lab README."
+    },
+    "bets_rate": {
+      "type": "data",
+      "title": "Bets per minute by outcome",
+      "query": "timeseries bets = sum(casino.bets.count), by: { casino.outcome }, from: now() - 1h",
+      "visualization": "lineChart",
+      "visualizationSettings": {
+        "thresholds": [],
+        "chartSettings": { "gapPolicy": "connect" }
+      }
+    },
+    "wager_p90": {
+      "type": "data",
+      "title": "Wager p90 by game",
+      "query": "timeseries wager_p90 = percentile(casino.wager.amount, 90), by: { casino.game.name }, from: now() - 1h",
+      "visualization": "barChart"
+    },
+    "red_rate": {
+      "type": "data",
+      "title": "RED — call rate by operation",
+      "query": "timeseries calls = sum(casino.red.calls), by: { span.name, status.code }, from: now() - 1h",
+      "visualization": "lineChart"
+    },
+    "red_duration": {
+      "type": "data",
+      "title": "RED — p90 duration by operation",
+      "query": "timeseries d_p90 = percentile(casino.red.duration, 90), by: { span.name }, from: now() - 1h",
+      "visualization": "lineChart"
+    },
+    "total_wagered": {
+      "type": "data",
+      "title": "Total wagered (1h)",
+      "query": "timeseries w = sum(casino.wager.amount), from: now() - 1h | summarize total = sum(arraySum(w))",
+      "visualization": "singleValue"
+    }
+  },
+  "layouts": {
+    "header":        { "x": 0,  "y": 0, "w": 24, "h": 2 },
+    "bets_rate":     { "x": 0,  "y": 2, "w": 12, "h": 6 },
+    "wager_p90":     { "x": 12, "y": 2, "w": 12, "h": 6 },
+    "total_wagered": { "x": 0,  "y": 8, "w": 6,  "h": 4 },
+    "red_rate":      { "x": 6,  "y": 8, "w": 9,  "h": 4 },
+    "red_duration":  { "x": 15, "y": 8, "w": 9,  "h": 4 }
+  }
+}

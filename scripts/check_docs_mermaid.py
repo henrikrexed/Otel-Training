@@ -30,12 +30,15 @@ M_PAGES = [f"module-{i}" for i in range(1, 6)] + ["setup"]
 ADVANCED_PAGES = [
     "advanced/getting-started",
     "advanced/environment",
+    "advanced/step-0-warmup",
     "advanced/step-1-instrument-with-agents",
-    "advanced/step-2-weaver-pipeline",
-    "advanced/step-3-cost-of-observability",
-    "advanced/step-4-high-cardinality",
-    "advanced/step-5-pii-logs",
-    "advanced/step-6-tail-sampling",
+    "advanced/step-2-business-metrics",
+    "advanced/step-3-weaver-pipeline",
+    "advanced/step-4-cost-of-observability",
+    "advanced/step-5-high-cardinality",
+    "advanced/step-6-pii-logs",
+    "advanced/step-7-tail-sampling",
+    "advanced/bindplane-opamp",
 ]
 
 errors: list[str] = []

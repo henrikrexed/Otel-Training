@@ -1,0 +1,52 @@
+# Catalog B6 — convert cumulative counters to delta temporality.
+#
+# Delta to merge into observability/collectors/gateway.yaml. The baseline gateway
+# already carries `cumulative_to_delta: {}` on the metrics pipeline — but EMPTY, so
+# it converts EVERY cumulative sum indiscriminately and keeps delta state forever.
+# This exercise replaces that with an EXPLICIT, targeted config: convert only the
+# monotonic casino counters, bound the state with max_staleness, and understand
+# WHY delta temporality is the right ingest shape for Dynatrace.
+#
+# TEMPORALITY in one line:
+#   * CUMULATIVE  — each point is the running total since process start
+#                   (1, 3, 6, 10, ...). A restart resets it to 0 -> a false drop.
+#   * DELTA       — each point is the count IN THAT interval (1, 2, 3, 4, ...).
+#                   Restart-safe, and `sum()` over a window = events in that window.
+# Dynatrace does rate math natively on delta counters, so bets/min, payout/min,
+# and SLO error-budget burn all come straight from `sum()` — no `rate()`-style
+# gymnastics and no restart artefacts.
+#
+# Placement keeps the pipeline invariants intact (the position is UNCHANGED from
+# the baseline, only the config body changes) —
+#   memory_limiter -> k8sattributes -> cumulative_to_delta -> otlp_http/dynatrace (exporter batching)
+# memory_limiter stays FIRST; there is NO batch processor (batching is on the exporter via sending_queue.batch). The processor only supports the
+# METRICS signal, so it lives on the metrics pipeline alone.
+
+processors:
+  cumulative_to_delta:
+    # Convert ONLY the monotonic casino counters. Leave gauges and any sum that is
+    # genuinely meaningful as a running total alone — converting a gauge is wrong,
+    # and converting a non-monotonic sum can produce negative deltas.
+    include:
+      metrics:
+        - casino.bets.count
+        - casino.payout.total
+      match_type: strict          # exact names; use `regexp` for a family prefix
+    # Bound the delta state: if a series stops reporting for this long (a pod went
+    # away, a game was disabled), forget its last cumulative value instead of
+    # holding it forever. Prevents a stale baseline from producing a huge false
+    # delta when the series resumes.
+    max_staleness: 10m
+    # auto (default): first point establishes the baseline and emits nothing;
+    # subsequent points emit the delta. keep | drop change first-point handling.
+    initial_value: auto
+
+# The metrics pipeline position is unchanged — cumulative_to_delta stays
+# right after k8sattributes. (Only the processor body changed from `{}` to the
+# explicit config above.)
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, cumulative_to_delta]
+      exporters: [otlp_http/dynatrace]

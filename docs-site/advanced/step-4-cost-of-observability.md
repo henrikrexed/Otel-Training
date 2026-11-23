@@ -1,4 +1,6 @@
-# Step 3 — Cost of observability
+# Step 4 — Cost of observability
+
+_The `labs/advanced/` directories keep their original feature-ordinal numbering, so they run one behind these doc steps — this page's assets live under `labs/advanced/step3-cost-center/`._
 
 **Goal:** attribute your telemetry spend. You cannot manage what you cannot
 attribute, so you will inject the Dynatrace cost-center attributes at the gateway
@@ -26,18 +28,41 @@ The baseline gateway exports telemetry with **no** `dt.cost.*` attributes, so
 You cannot answer "how much does the casino platform cost vs the scoring
 service?".
 
-## The fix — inject the cost-center at the gateway
+## ② Opencode — inject the cost-center at the gateway
 
-Apply the `resource/costcenter` processor
-(`labs/advanced/step3-cost-center/cost-center-processor.yaml`), which is already
-merged into the composed `labs/advanced/gateway-advanced.yaml` in the correct
-pipeline position (after `k8sattributes`, before `batch`):
+This is the first **collector** fix, so you drive `opencode` at the gateway
+config with the `otel-collector` skill — goal, target file, skill:
 
 ```bash
-# set the cost center for your team, then apply the gateway with the processor wired in
+opencode run "Using the otel-collector skill: in observability/collectors/gateway.yaml \
+add a resource processor named resource/costcenter that sets the resource \
+attributes dt.cost.costcenter and dt.cost.product from the env vars COST_CENTER \
+and COST_PRODUCT. Wire it into all three pipelines AFTER k8sattributes. \
+Do not move memory_limiter (first) and do not add a batch processor."
+```
+
+## ③ Review — read the diff
+
+Confirm the processor lands **after `k8sattributes`, before the exporter** in every
+pipeline and that `memory_limiter` stays first. The reference answer is
+`labs/advanced/step3-cost-center/cost-center-processor.yaml`, already merged into
+the composed `labs/advanced/gateway-advanced.yaml` in the correct position.
+
+!!! warning "If the agent gets it wrong — steer it back"
+    If it puts the processor before `k8sattributes` or moves `memory_limiter`, reply
+    *"memory_limiter must stay first and there is no batch processor; a resource processor goes
+    after k8sattributes — move it there in every pipeline."*
+
+## ④ Apply — kubectl (collector namespace, not GitOps)
+
+The gateway lives in the `observability` namespace, which Argo CD does **not**
+manage, so you apply it directly:
+
+```bash
+# set the cost center for your team, then apply the edited gateway
 kubectl -n observability set env deployment/otel-gateway-collector \
   COST_CENTER=casino-platform-training COST_PRODUCT=vegas-casino
-kubectl apply -f labs/advanced/gateway-advanced.yaml
+kubectl apply -f observability/collectors/gateway.yaml
 ```
 
 Every span, metric, and log the gateway exports now carries
@@ -68,9 +93,9 @@ fetch logs, from: now() - 1h
 
 ## Definition of done
 
-- [ ] The `resource/costcenter` processor is wired into the gateway (after `k8sattributes`, before `batch`)
+- [ ] The `resource/costcenter` processor is wired into the gateway (after `k8sattributes`, before the exporter)
 - [ ] `COST_CENTER` / `COST_PRODUCT` are set on the gateway deployment
 - [ ] The DQL returns rows keyed by `dt.cost.costcenter` / `dt.cost.product`
 - [ ] Cost allocation in Dynatrace splits DDU per cost center
 
-Next: [Step 4 — High-cardinality metrics](step-4-high-cardinality.md).
+Next: [Step 5 — High-cardinality metrics](step-5-high-cardinality.md).

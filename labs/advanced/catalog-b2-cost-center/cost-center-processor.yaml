@@ -1,0 +1,55 @@
+# Catalog B2 — derive the cost-center attribute at the gateway (topology-driven).
+#
+# Difference from Step 4 (docs-site/advanced/step-4-cost-of-observability.md):
+#   Step 4 stamps a SINGLE, STATIC cost center from an env var
+#   (resource/costcenter -> dt.cost.costcenter = ${env:COST_CENTER}). That is right
+#   when one team owns the whole gateway. But one shared gateway usually ingests for
+#   MANY namespaces/teams at once — a static value lumps them all into one bucket and
+#   finance can no longer tell casino from scoring from platform.
+#
+#   B2 DERIVES the cost center per signal from the telemetry's OWN topology
+#   (k8s.namespace.name / service.name) with a `transform` processor (OTTL, resource
+#   context). One rule set, applied to traces + metrics + logs, attributes every
+#   record to the right owner with no per-service config and no app change.
+#
+# Why `dt.cost.costcenter` (not a bare `cost_center`): Dynatrace Cost Allocation /
+# Account Management recognizes the resource attributes `dt.cost.costcenter` and
+# `dt.cost.product` as the contract for showback/chargeback (same attributes Step 4
+# uses). A plain `cost_center` string would group in DQL but would NOT feed Cost
+# Allocation. Instrument the concept "cost center"; stamp the vendor contract.
+#
+# Merge this `transform/costcenter` block into observability/collectors/gateway.yaml
+# and add it to EVERY pipeline right after k8sattributes — enrichment stays together,
+# after association, before the exporter.
+
+processors:
+  transform/costcenter:
+    error_mode: ignore          # a record missing k8s.namespace.name => falls through to the default, never errors the batch
+    # Resource context => sets a RESOURCE attribute (shared by every span/datapoint/log
+    # under that resource). The `attributes` processor CANNOT write resource attributes —
+    # that is why this is a transform with `context: resource`, not an attributes processor.
+    trace_statements: &costcenter_statements
+      - context: resource
+        statements:
+          # 1) default first so nothing is ever unattributed, then override by topology (order matters)
+          - set(attributes["dt.cost.costcenter"], "shared-unallocated") where attributes["dt.cost.costcenter"] == nil
+          - set(attributes["dt.cost.product"], "shared")                where attributes["dt.cost.product"] == nil
+          # 2) map by namespace -> owning cost center + product
+          - set(attributes["dt.cost.costcenter"], "casino-platform")       where attributes["k8s.namespace.name"] == "casino"
+          - set(attributes["dt.cost.product"], "vegas-casino")             where attributes["k8s.namespace.name"] == "casino"
+          - set(attributes["dt.cost.costcenter"], "platform-observability") where attributes["k8s.namespace.name"] == "observability"
+          - set(attributes["dt.cost.product"], "otel-platform")            where attributes["k8s.namespace.name"] == "observability"
+          # 3) refine by service for a team that shares a namespace (derive from service, not just namespace)
+          - set(attributes["dt.cost.costcenter"], "casino-scoring") where attributes["k8s.namespace.name"] == "casino" and IsString(attributes["service.name"]) and IsMatch(attributes["service.name"], "^scoring.*")
+    # Same rules for the other two signals — one cost-center contract across traces, metrics, logs.
+    metric_statements: *costcenter_statements
+    log_statements: *costcenter_statements
+
+# Pipeline wiring (add transform/costcenter after k8sattributes in EACH pipeline;
+# note this gateway has NO `batch` processor — batching is on the exporter
+# (sending_queue.batch), which is still "last". memory_limiter stays FIRST):
+#   traces:  [memory_limiter, k8sattributes, transform/costcenter]
+#   metrics: [memory_limiter, k8sattributes, transform/costcenter, cumulative_to_delta]
+#   logs:    [memory_limiter, k8sattributes, transform/costcenter]
+#
+# The fully merged gateway reference is labs/advanced/gateway-advanced.yaml.

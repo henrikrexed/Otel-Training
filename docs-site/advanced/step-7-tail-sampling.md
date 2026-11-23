@@ -1,4 +1,6 @@
-# Step 6 — Tail sampling
+# Step 7 — Tail sampling
+
+_The `labs/advanced/` directories keep their original feature-ordinal numbering, so they run one behind these doc steps — this page's assets live under `labs/advanced/step6-tail-sampling/`._
 
 **Goal:** cut trace ingest cost sharply while keeping every trace that matters —
 errors, slow traces, and jackpots. Budget 25 minutes.
@@ -29,14 +31,34 @@ No sampling at the gateway — every trace is exported. Trace ingest cost scales
 linearly with casino load, and most of it is fast, successful, uninteresting
 spins.
 
-## The fix — tail sampling at the gateway
+## ② Opencode — tail sampling at the gateway
 
-Apply the `tail_sampling` processor
-(`labs/advanced/step6-tail-sampling/tail-sampling-processor.yaml`), wired into the
-traces pipeline in the composed gateway:
+Drive `opencode` at the gateway with the `otel-collector` skill — goal (the four
+policies), target file, skill:
 
 ```bash
-kubectl apply -f labs/advanced/gateway-advanced.yaml
+opencode run "Using the otel-collector skill: in observability/collectors/gateway.yaml \
+add a tail_sampling processor to the TRACES pipeline with decision_wait 10s and \
+four policies — status_code=ERROR keep 100%, latency>1s keep 100%, \
+casino.outcome=jackpot keep 100%, and everything else probabilistic at 10%. Place \
+it after k8sattributes/resource and before the exporter; keep memory_limiter first."
+```
+
+## ③ Review — read the diff
+
+Confirm all four policies are present, `decision_wait` is 10s, and the processor
+is in the **traces** pipeline after `k8sattributes`/`resource`, before the exporter.
+Reference answer: `labs/advanced/step6-tail-sampling/tail-sampling-processor.yaml`.
+
+!!! warning "If the agent gets it wrong — steer it back"
+    If it drops the jackpot policy or samples errors, reply *"errors, slow (>1s),
+    and jackpots must each keep 100% — only the remaining 'boring' traces sample
+    to 10%."*
+
+## ④ Apply — kubectl
+
+```bash
+kubectl apply -f observability/collectors/gateway.yaml
 ```
 
 Policies: `status_code=ERROR` → 100%, `latency > 1s` → 100%,
@@ -69,13 +91,15 @@ fetch spans, from: now() - 1h
 
 ## Definition of done
 
-- [ ] The `tail_sampling` processor is wired into the traces pipeline (after `k8sattributes`/`resource`, before `batch`)
+- [ ] The `tail_sampling` processor is wired into the traces pipeline (after `k8sattributes`/`resource`, before the exporter)
 - [ ] The four policies are in place (error / slow / jackpot → 100%, else 10%)
 - [ ] Total trace volume drops after the fix
 - [ ] The absolute error/slow/jackpot count is unchanged
 - [ ] A known error trace is still complete end-to-end
 
-You have finished the advanced self-paced track — instrumentation, a
-convention guard, cost attribution, cardinality control, PII redaction, and
-sampling, each proven in Dynatrace. Back to [Getting started](getting-started.md)
-or the facilitator-led [M0–M5 modules](../setup.md).
+You have finished the advanced self-paced track — a warmed-up coding agent,
+money-path instrumentation, business metrics, a convention guard, cost
+attribution, cardinality control, PII redaction, and sampling, each driven
+through the **Problem → Opencode → Verify** loop and proven in Dynatrace. Back to
+[Getting started](getting-started.md) or the facilitator-led
+[M0–M5 modules](../setup.md).

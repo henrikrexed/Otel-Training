@@ -1,0 +1,80 @@
+# OpAMP gateway (relay) — BindPlane OP.
+#
+# The BindPlane OpAMP Gateway is a relay that is BOTH an OpAMP *server* facing
+# downstream (bridges/collectors connect to it on :4320) AND an OpAMP *client*
+# upstream to the BindPlane server. Use it for segmented/firewalled clusters or a
+# fleet spanning many networks where you want a single upstream egress point. If
+# collectors can reach the BindPlane server directly, skip the relay and point the
+# OpAMPBridge straight at the server on :3001 (see the fallback in opampbridge.yaml).
+#
+# ALPHA — the OpAMP Gateway and its BINDPLANE_* flags are version-sensitive. Pin
+# the image and re-verify env/flag names against the release you deploy.
+#
+# Prereq: BindPlane OP server reachable (see README.md), and a connection token in
+# the `bindplane-gateway` Secret:
+#   kubectl -n observability create secret generic bindplane-gateway \
+#     --from-literal=BINDPLANE_OPAMP_TOKEN='<token-from-bindplane>'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bindplane-gateway
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: bindplane-gateway
+    app.kubernetes.io/component: opamp-relay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bindplane-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bindplane-gateway
+        app.kubernetes.io/component: opamp-relay
+    spec:
+      containers:
+        - name: gateway
+          # Pin the relay image (alpha — do not float to latest).
+          image: ghcr.io/observiq/bindplane-gateway:1.24.0
+          args:
+            - serve
+          ports:
+            # Downstream OpAMP server — the OpAMPBridge connects here.
+            - name: opamp
+              containerPort: 4320
+          env:
+            # Upstream OpAMP client — where the relay registers to the BindPlane server.
+            - name: BINDPLANE_OPAMP_SERVER_URL
+              value: ws://bindplane.observability.svc.cluster.local:3001/v1/opamp
+            # Connection token the relay presents upstream to BindPlane.
+            - name: BINDPLANE_OPAMP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: bindplane-gateway
+                  key: BINDPLANE_OPAMP_TOKEN
+            # Downstream listen address for bridges/collectors.
+            - name: BINDPLANE_OPAMP_LISTEN
+              value: "0.0.0.0:4320"
+          readinessProbe:
+            tcpSocket:
+              port: 4320
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bindplane-gateway
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: bindplane-gateway
+spec:
+  selector:
+    app.kubernetes.io/name: bindplane-gateway
+  ports:
+    # Bridges connect to ws://bindplane-gateway.observability.svc.cluster.local:4320/v1/opamp
+    - name: opamp
+      port: 4320
+      targetPort: 4320

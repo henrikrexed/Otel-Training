@@ -1,0 +1,48 @@
+# Step 5 escalation — OTel Operator OpAMP bridge → BindPlane OP.
+#
+# Hand-maintaining regex redaction across many services gets unwieldy fast (new PII shapes,
+# per-service exceptions, audit trail). BindPlane OP manages collector config centrally and
+# ships curated PII/"Mask Sensitive Data" processors; the OTel Operator's OpAMP bridge
+# connects the cluster's operator-managed collectors to BindPlane over OpAMP so config is
+# pushed remotely — no more editing YAML by hand.
+#
+# Prereq: the OpAMP gateway/relay reachable on :4320 (opamp-gateway.yaml) — or, for
+# the direct fallback, BindPlane OP on :3001 (see README.md). The operator (v0.162.0)
+# ships the OpAMPBridge CRD.
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpAMPBridge
+metadata:
+  name: casino-opamp-bridge
+  namespace: observability
+spec:
+  # Tag tracks the OTel Operator release line (versions.env OTEL_OPERATOR_VERSION=v0.162.0;
+  # the bridge image omits the leading "v"). Keep in lockstep when bumping the operator.
+  image: ghcr.io/open-telemetry/opentelemetry-operator/operator-opamp-bridge:0.162.0
+  # Default: the OpAMP gateway (relay) downstream endpoint on :4320. The relay is
+  # itself an OpAMP server facing the bridge and an OpAMP client upstream to the
+  # BindPlane server — use it for segmented/firewalled clusters (see opamp-gateway.yaml).
+  endpoint: ws://bindplane-gateway.observability.svc.cluster.local:4320/v1/opamp
+  # Direct-to-server fallback (no relay): point straight at BindPlane OP on :3001
+  # when the cluster can reach the server and a single egress hop is unnecessary.
+  # endpoint: ws://bindplane.observability.svc.cluster.local:3001/v1/opamp
+  headers:
+    # BindPlane connection secret (API key / bearer), sourced from a K8s Secret in prod.
+    Authorization: ${env:BINDPLANE_OPAMP_TOKEN}
+  # Report the operator-managed collectors up to BindPlane and accept remote config.
+  capabilities:
+    AcceptsRemoteConfig: true
+    ReportsEffectiveConfig: true
+    ReportsOwnTraces: true
+    ReportsOwnMetrics: true
+    ReportsOwnLogs: true
+    ReportsHealth: true
+    ReportsRemoteConfig: true
+  componentsAllowed:
+    receivers:
+      - otlp
+    processors:
+      - redaction
+      - transform
+      - memory_limiter
+    exporters:
+      - otlp_http

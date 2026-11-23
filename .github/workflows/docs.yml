@@ -27,6 +27,11 @@ on:
 permissions:
   contents: read
 
+# Allow one Pages deployment at a time; don't cancel an in-flight publish.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   build-and-verify:
     runs-on: ubuntu-latest
@@ -49,9 +54,26 @@ jobs:
         run: python scripts/check_docs_mermaid.py site
 
       - name: Install Playwright Chromium
+        # `playwright install --with-deps` apt-installs OS libraries and downloads
+        # the Chromium build; on a freshly-rotated `ubuntu-latest` runner image this
+        # step intermittently fails (transient apt-mirror / browser-download errors),
+        # which skips the render gate and reds the whole PR even when the docs are
+        # fine. Split the apt deps from the browser download and retry each up to 3×
+        # so a transient hiccup no longer blocks the build. Still fails hard if the
+        # install genuinely cannot complete.
         run: |
+          set -eu
           pip install playwright
-          python -m playwright install --with-deps chromium
+          retry() {
+            n=0
+            until "$@"; do
+              n=$((n+1))
+              if [ "$n" -ge 3 ]; then echo "::error::'$*' failed after $n attempts"; return 1; fi
+              echo "attempt $n for '$*' failed; retrying in 10s"; sleep 10
+            done
+          }
+          retry python -m playwright install-deps chromium
+          retry python -m playwright install chromium
 
       - name: Render check — mermaid in both palettes
         run: python scripts/render_palettes.py site
@@ -65,11 +87,24 @@ jobs:
 
   deploy:
     # Publish to GitHub Pages only from main, after the build+render gate passes.
+    #
+    # ISI-7607: this repo's Pages is configured with build_type=workflow, so the
+    # live site is served ONLY from an artifact uploaded by actions/deploy-pages.
+    # The previous step ran `mkdocs gh-deploy --force`, which pushes the gh-pages
+    # branch — the legacy "deploy from branch" method that build_type=workflow
+    # IGNORES. Result: every run updated the gh-pages branch but the live site
+    # never changed (it was frozen at the last real workflow deploy). Switching
+    # to the official upload-pages-artifact + deploy-pages flow makes the deploy
+    # actually reach the CDN, matching the repo's Pages build_type.
     needs: build-and-verify
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -79,5 +114,12 @@ jobs:
           cache-dependency-path: requirements-docs.txt
       - name: Install docs dependencies
         run: pip install -r requirements-docs.txt
+      - name: Build site (strict)
+        run: mkdocs build --strict
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
       - name: Deploy to GitHub Pages
-        run: mkdocs gh-deploy --force
+        id: deployment
+        uses: actions/deploy-pages@v4

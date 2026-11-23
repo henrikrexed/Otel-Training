@@ -1,0 +1,67 @@
+# Catalog B5 — structure unstructured casino logs with the transform (OTTL) processor.
+#
+# Delta to merge into observability/collectors/gateway.yaml. The casino slots
+# service still emits a single unstructured log LINE per settled spin, e.g.:
+#
+#   level=INFO msg="spin settled" game=slots bet=50 outcome=win payout=150
+#
+# In Dynatrace that arrives as one opaque `content` string: you cannot filter by
+# outcome, group by game, or sort by severity — it is text, not data. This
+# transform PARSES that line into typed attributes with OTTL (ExtractPatterns +
+# merge_maps) and lifts the parsed level into the real OTLP severity fields, so
+# the log becomes queryable and correctly classified. "Parse at the gateway, once"
+# is the lesson: every service's logs get structured in one place, no app change.
+#
+# Placement keeps the pipeline invariants intact —
+#   memory_limiter -> k8sattributes -> transform/structure_logs -> otlp_http/dynatrace (exporter batching)
+# memory_limiter stays FIRST; there is NO batch processor (batching is on the exporter via sending_queue.batch). Only the LOGS pipeline changes;
+# traces and metrics are untouched.
+
+processors:
+  # transform processor (OTTL), logs context. error_mode: ignore means a log line
+  # that is NOT one of these casino spin lines (already-structured JSON, a startup
+  # banner, a stack trace) simply does not match the regex and is passed through
+  # unchanged rather than erroring the batch.
+  transform/structure_logs:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          # 1. One-pass extract of the logfmt fields into TEMP (underscore) keys.
+          #    merge_maps(..., "insert") only adds keys that are absent, so a line
+          #    that is already structured is left alone. The IsMatch guard skips
+          #    lines that are not a casino spin record.
+          - merge_maps(attributes, ExtractPatterns(body, "level=(?P<lvl>\\w+)\\s+msg=\"(?P<msg>[^\"]*)\"\\s+game=(?P<game>\\S+)\\s+bet=(?P<bet>\\d+)\\s+outcome=(?P<outcome>\\S+)\\s+payout=(?P<payout>\\d+)"), "insert") where IsString(body) and IsMatch(body, "game=\\S+")
+
+          # 2. Promote temp keys to the casino.* semantic-convention attributes,
+          #    typed (Int for the numeric fields so DQL can do math on them).
+          - set(attributes["casino.game.name"], attributes["game"])      where attributes["game"] != nil
+          - set(attributes["casino.outcome"], attributes["outcome"])     where attributes["outcome"] != nil
+          - set(attributes["casino.bet.amount"], Int(attributes["bet"]))    where attributes["bet"] != nil
+          - set(attributes["casino.payout.amount"], Int(attributes["payout"])) where attributes["payout"] != nil
+
+          # 3. Lift the parsed level into the OTLP severity fields so Dynatrace
+          #    classifies the log (INFO/WARN/ERROR) instead of showing "unknown".
+          - set(severity_text, attributes["lvl"]) where attributes["lvl"] != nil
+          - set(severity_number, SEVERITY_NUMBER_INFO)  where attributes["lvl"] == "INFO"
+          - set(severity_number, SEVERITY_NUMBER_WARN)  where attributes["lvl"] == "WARN"
+          - set(severity_number, SEVERITY_NUMBER_ERROR) where attributes["lvl"] == "ERROR"
+
+          # 4. Replace the opaque body with the human message, then drop the temp
+          #    keys so only the clean semconv attributes remain.
+          - set(body, attributes["msg"]) where attributes["msg"] != nil
+          - delete_key(attributes, "lvl")
+          - delete_key(attributes, "msg")
+          - delete_key(attributes, "game")
+          - delete_key(attributes, "bet")
+          - delete_key(attributes, "outcome")
+          - delete_key(attributes, "payout")
+
+# Wire the transform onto the logs pipeline, last — right after k8sattributes.
+# (Only the logs pipeline changes; traces/metrics are untouched.)
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, k8sattributes, transform/structure_logs]
+      exporters: [otlp_http/dynatrace]
