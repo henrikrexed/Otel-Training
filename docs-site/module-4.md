@@ -1,8 +1,11 @@
-# M4 — Sampling: cost/fidelity strategy
+# M4 — Sampling + cost attribution: cost/fidelity strategy
 
-**Goal:** cut ingest cost without losing the traces you would actually debug.
-Break it naively first, then build a defensible policy on the collector. 30
-minutes.
+**Goal:** cut ingest cost without losing the traces you would actually debug,
+then attribute that ingest to a **cost center** you create and wire into the
+collector pipeline. Break sampling naively first (via `opencode` + a Gitea PR),
+build the defensible policy on the collector (via `opencode` + `kubectl
+apply`), and stamp `dt.cost.costcenter` on everything the gateway exports.
+35 minutes.
 
 ## Concepts (5 min)
 
@@ -34,19 +37,31 @@ traces**, your cluster filter, last 15 minutes. Record:
 
 This is the fidelity baseline. Every change below is judged against it.
 
-## Step 2 — break it: naive head sampling
+## Step 2 — break it: naive head sampling (opencode → Gitea PR)
 
 If you sampled 10% at the head you would save ~90% of span ingest. Try it on
-one service. In Gitea, `33-blackjack.yaml`, add to the container env:
+one service. Drive the agent at the blackjack manifest in your Gitea clone:
 
-```yaml
-- name: OTEL_TRACES_SAMPLER
-  value: "parentbased_traceidratio"
-- name: OTEL_TRACES_SAMPLER_ARG
-  value: "0.1"
+```bash
+cd ~/casino
+git switch main && git pull
+git switch -c experiment/blackjack-head-sampling
+
+opencode run "Using the otel-instrumentation skill: in k8s/33-blackjack.yaml, add two \
+container env vars for a naive head-sampling experiment — OTEL_TRACES_SAMPLER=\"parentbased_traceidratio\" \
+and OTEL_TRACES_SAMPLER_ARG=\"0.1\". Change nothing else."
 ```
 
-Commit, wait for the rollout, give it 5 minutes of traffic.
+Review the diff (it should be exactly those two env vars), then PR → merge →
+Argo, wait for the rollout, and give it 5 minutes of traffic:
+
+```bash
+git add k8s/33-blackjack.yaml
+git commit -m "experiment(blackjack): naive 10% head sampling"
+git push -u origin experiment/blackjack-head-sampling
+# Gitea → casino/casino → Pull requests → base main ← experiment/blackjack-head-sampling → Merge
+kubectl -n casino rollout status deploy/vegas-casino-blackjack
+```
 
 **What you should see in Dynatrace:** blackjack spans drop to roughly 10%.
 Now filter your view to `status = ERROR`: errors dropped to ~10% too. You
@@ -54,17 +69,35 @@ saved money and lost ~90% of your visibility into the exact requests you
 would be paged for. Keep that feeling — it is the entire argument for tail
 sampling.
 
-**Revert it now** (delete the two env vars, commit) so blackjack is honest
-again for the rest of the lab.
+**Revert it now** (delete the two env vars via the same opencode → PR loop, or
+`git revert` the merge in Gitea) so blackjack is honest again for the rest of
+the lab.
 
-## Step 3 — build it: tail sampling on the gateway
+## Step 3 — build it: tail sampling on the gateway (opencode → kubectl apply)
 
 Sampling policy belongs at the aggregation tier where the whole trace is
-visible. In your Codespace repo, edit `observability/collectors/gateway.yaml`.
+visible. In your Codespace repo, drive the agent at the gateway collector
+config with the `otel-collector` + `otel-ottl` skills:
 
-### 3a. Drop health checks before buffering
+```bash
+opencode run "Using the otel-collector and otel-ottl skills: in \
+observability/collectors/gateway.yaml — (a) add a filter/noise processor that drops \
+traces whose span has attributes[\"http.route\"] == \"/health\" or \"/healthz\", placed in the \
+traces pipeline right after k8sattributes; (b) add a tail_sampling processor (decision_wait: 10s, \
+num_traces: 50000) with policies keep-errors (status_code ERROR), keep-slow (latency threshold_ms: 500), \
+baseline (probabilistic sampling_percentage: 10), placed after filter/noise in the traces pipeline; \
+(c) add a spanmetrics connector (explicit histogram buckets [5ms,10ms,25ms,50ms,100ms,250ms,500ms,1s,2.5s,5s,10s], \
+dimensions http.method + http.route, exemplars enabled) and wire it both ways: traces pipeline exporters \
+[otlp_http/dynatrace, spanmetrics], metrics pipeline receivers [otlp, spanmetrics]. Keep memory_limiter \
+first on every pipeline and do NOT add a batch processor."
+```
 
-No reason to buffer spans you will never keep. Add a filter processor:
+### ③ Review — the diff should converge on:
+
+#### 3a. Drop health checks before buffering
+
+No reason to buffer spans you will never keep. The diff should add a filter
+processor and put it in the traces pipeline right after `k8sattributes`:
 
 ```yaml
     processors:
@@ -74,9 +107,7 @@ No reason to buffer spans you will never keep. Add a filter processor:
             - 'attributes["http.route"] == "/health" or attributes["http.route"] == "/healthz"'
 ```
 
-And put it in the traces pipeline right after `k8sattributes`.
-
-### 3b. Add the tail sampling policy
+#### 3b. The tail sampling policy
 
 ```yaml
     processors:
@@ -102,10 +133,11 @@ Read it as three sentences: *every failed trace is kept; every trace slower
 than 500 ms is kept; everything else survives at 10%.* Those numbers are the
 cost/fidelity dial you will defend to your platform budget holder.
 
-### 3c. Add the spanmetrics connector
+#### 3c. The spanmetrics connector
 
 Sampling will delete most traces; RED metrics should not follow them down.
-Add a connector section (top level of `config:`, next to `processors:`):
+The diff should add a connector section (top level of `config:`, next to
+`processors:`):
 
 ```yaml
     connectors:
@@ -120,7 +152,7 @@ Add a connector section (top level of `config:`, next to `processors:`):
           enabled: true
 ```
 
-Wire both sides — traces export into it, metrics read from it:
+And wire both sides — traces export into it, metrics read from it:
 
 ```yaml
     service:
@@ -138,7 +170,16 @@ Wire both sides — traces export into it, metrics read from it:
 *(If you skipped the M3 stretch, your metrics processors simply will not have
 `transform/drop_player_id`. Keep the rest of your own file's lists.)*
 
-### 3d. Validate, apply, verify
+!!! warning "If the agent gets it wrong — steer it back"
+    - **tail_sampling before filter/noise, or before k8sattributes**: *"order in
+      the traces pipeline must be `memory_limiter, k8sattributes, filter/noise,
+      tail_sampling` — enrichment first, then drop noise, then sample."*
+    - **spanmetrics not wired both ways**: *"traces pipeline must export to
+      `spanmetrics` AND metrics pipeline must receive from `spanmetrics`."*
+    - **Adds a `batch` processor**: *"no batch processor — batching stays on the
+      exporter's `sending_queue.batch`."*
+
+### ④ 3d. Validate, apply, verify
 
 ```bash
 bash observability/validate.sh
@@ -168,13 +209,140 @@ the corresponding traces no longer exist.
     15s. And watch collector memory: `num_traces` buffers decisions; on a
     small kind node, 50000 is plenty, at fleet scale it is a tuning knob.
 
+## Step 4 — the cost-center exercise: create a cost center id, wire it into the collector pipeline
+
+Sampling decides *how much* you ingest; a cost center decides *who pays for
+it*. Dynatrace Cost Allocation reads the **resource attributes**
+`dt.cost.costcenter` and `dt.cost.product` — stamp them once at the gateway
+and every span, metric, and log you export is attributable. Right now your
+telemetry lands in one undifferentiated bucket.
+
+### ① Create your cost-center id
+
+Pick the id that will identify your team's ingest in the shared tenant — your
+`PARTICIPANT_ID` keeps it unique in class:
+
+```bash
+export COST_CENTER_ID="casino-${PARTICIPANT_ID}"     # e.g. casino-jdoe-42
+echo "$COST_CENTER_ID"
+```
+
+### ② Opencode — wire the cost center into the gateway pipeline
+
+Drive the agent at the collector config with the `otel-collector` +
+`otel-ottl` skills. The reference patterns already exist in this repo —
+[`labs/advanced/step3-cost-center/cost-center-processor.yaml`](https://github.com/henrikrexed/Otel-Training/blob/main/labs/advanced/step3-cost-center/cost-center-processor.yaml)
+(static `resource/costcenter` from an env var) and
+[`labs/advanced/catalog-b2-cost-center/`](https://github.com/henrikrexed/Otel-Training/blob/main/labs/advanced/catalog-b2-cost-center/)
+(OTTL `transform/costcenter` derived from topology — see the
+[advanced catalog B2](advanced/catalog-b2-cost-center.md) for the derived
+variant):
+
+```bash
+opencode run "Using the otel-collector and otel-ottl skills: in \
+observability/collectors/gateway.yaml add a resource/costcenter processor that upserts \
+the RESOURCE attributes dt.cost.costcenter = '\${env:COST_CENTER_ID}' and \
+dt.cost.product = 'vegas-casino' (attributes action upsert, like \
+labs/advanced/step3-cost-center/cost-center-processor.yaml). Add env var COST_CENTER_ID with \
+the literal value '$COST_CENTER_ID' to the collector CR spec.env. Reference resource/costcenter \
+in ALL THREE pipelines (traces, metrics, logs) right after k8sattributes — e.g. traces: \
+[memory_limiter, k8sattributes, resource/costcenter]. Keep memory_limiter first; no batch processor."
+```
+
+### ③ Review — the diff should converge on:
+
+```yaml
+    processors:
+      resource/costcenter:
+        attributes:
+          - key: dt.cost.costcenter
+            value: ${env:COST_CENTER_ID}     # e.g. "casino-jdoe-42"
+            action: upsert
+          - key: dt.cost.product
+            value: vegas-casino
+            action: upsert
+```
+
+```yaml
+    service:
+      pipelines:
+        traces:  { processors: [memory_limiter, k8sattributes, resource/costcenter] }
+        metrics: { processors: [memory_limiter, k8sattributes, resource/costcenter, cumulative_to_delta] }
+        logs:    { processors: [memory_limiter, k8sattributes, resource/costcenter] }
+```
+
+Plus in the CR's `spec.env`:
+
+```yaml
+    env:
+      - name: COST_CENTER_ID
+        value: casino-<PARTICIPANT_ID>     # your id from step ①
+```
+
+!!! warning "If the agent gets it wrong — steer it back"
+    - **Uses the `attributes` processor or a signal-level attribute**: *"the
+      cost center is a **resource** attribute — use the `resource` processor
+      (or `transform` with `context: resource`), not `attributes`."*
+    - **Stamps a bare `cost_center`**: *"Dynatrace Cost Allocation reads
+      `dt.cost.costcenter` / `dt.cost.product` — stamp those exact keys."*
+    - **Only tags traces**: *"wire `resource/costcenter` into metrics and logs
+      too — allocation must cover all ingest."*
+    - **Forgets the env var in `spec.env`**: *"`${env:COST_CENTER_ID}` resolves
+      from the collector container env — add `COST_CENTER_ID` to `spec.env`, or
+      the attribute lands empty."*
+
+### ④ Apply — validate, kubectl apply
+
+```bash
+bash observability/validate.sh
+kubectl apply -f observability/collectors/gateway.yaml
+kubectl -n observability rollout status deploy/otel-gateway-collector
+```
+
+### ⑤ Verify — `dt.cost.costcenter` lands on telemetry
+
+Give it a minute (k6 keeps playing), then with your cluster filter:
+
+```dql
+fetch spans, from: now() - 15m
+| filter k8s.cluster.name == "<PARTICIPANT_ID>"
+| summarize spans = count() by: { dt.cost.costcenter }
+| sort spans desc
+```
+
+```dql
+fetch logs, from: now() - 15m
+| filter k8s.cluster.name == "<PARTICIPANT_ID>"
+| summarize logs = count() by: { dt.cost.costcenter }
+```
+
+- **Before:** `dt.cost.costcenter` is null on every record — one
+  undifferentiated bucket in Account Management → Cost allocation.
+- **After:** your spans **and** logs carry `dt.cost.costcenter ==
+  "casino-<PARTICIPANT_ID>"` (and `dt.cost.product == "vegas-casino"`), and the
+  Cost allocation view attributes your ingest to your cost center.
+
+!!! tip "The scalable version derives the cost center from topology"
+    A static env var is right when one team owns the gateway. When the gateway
+    ingests for many namespaces/teams, derive the cost center per record from
+    `k8s.namespace.name` / `service.name` with a `transform/costcenter` OTTL
+    processor — that is the
+    [advanced catalog B2 exercise](advanced/catalog-b2-cost-center.md)
+    (`labs/advanced/catalog-b2-cost-center/`), with the default-first
+    `shared-unallocated` guard.
+
 ## Definition of done — M4
 
 - [ ] Baseline, naive-head, and tail-sampling measurements recorded
 - [ ] You can state your policy in one sentence ("all errors, all >500 ms,
       10% of the rest") and defend both what it saves (ingest) and what it
       costs (decision latency, collector memory, blind spots under threshold)
+- [ ] Tail sampling + spanmetrics driven by `opencode`, validated and applied
+      to the gateway
 - [ ] spanmetrics RED series visible for game services
 - [ ] ERROR visibility ~unchanged vs baseline while total traces dropped
+- [ ] You created a cost-center id, wired `resource/costcenter` into all three
+      collector pipelines via `opencode`, and verified `dt.cost.costcenter`
+      lands on your spans and logs in DQL
 
 Next: [M5 — Operating at scale](module-5.md).

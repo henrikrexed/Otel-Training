@@ -1,8 +1,14 @@
 # M1 — Tour the broken casino: OTel core principles
 
 **Goal:** play the casino, read its telemetry, and correctly diagnose the first
-planted defect — traces that break at the slots service. You fix it with one
-line of configuration. 30 minutes.
+planted defect — traces that break at the slots service. You fix it by driving
+`opencode` (the `otel-instrumentation` skill) against your Gitea repo, then
+land the fix through the full **branch → PR in Gitea → merge → Argo CD sync**
+loop and verify in DQL. 30 minutes.
+
+This module teaches the loop every later module reuses:
+**① Problem (Dynatrace) → ② Opencode → ③ Review diff → ④ Apply (Gitea PR →
+Argo) → ⑤ Verify (DQL)** — introduced in [M0](setup.md#the-agent-loop-you-will-use-all-day).
 
 ## Concepts (5 min)
 
@@ -25,10 +31,12 @@ collector only receives what the SDK sends.** If the SDK mis-propagates or
 mislabels, no collector can fix it downstream. That is why this training fixes
 SDK problems first (M1–M2) and collector problems second (M3–M4).
 
-## The defect hunt
+## ① Problem — the defect hunt (in Dynatrace)
 
 Keep the frontend port-forward running (M0), make sure you played at least a
-few rounds of **slots** and one other game, then open Dynatrace.
+few rounds of **slots** and one other game, then open Dynatrace. Confirm the
+symptom with the checkpoint DQL below **before** touching anything — that is
+the "before" you verify against at the end.
 
 !!! note "Logged in with made-up details?"
     The casino login is fake (no real auth) — if you skipped it, register with
@@ -97,37 +105,75 @@ ignored.
     Every other service uses the default (`tracecontext,baggage`), which is
     why they stay connected.
 
-## The fix
+## ② Opencode — drive the fix in your Gitea clone
 
-Configuration lives in Git, not in the running cluster. Fix it where the
-manifest lives:
+Configuration lives in Git, not in the running cluster. Clone your Gitea repo
+into the Codespace, cut a branch, and let `opencode` make the edit — the prompt
+names the **goal**, the **target file**, and the **skill**:
 
-1. Open Gitea (http://localhost:30001), repo `casino/casino`.
-2. Open `30-slots.yaml` and find the env block of the slots container:
+```bash
+cd ~
+git clone http://attendee:trainingpass123@localhost:30001/casino/casino.git
+cd casino
+git switch -c fix/slots-w3c-propagators
 
-    ```yaml
-    # Slots still correlates via the legacy in-house header from the 2021
-    # framework instead of W3C Trace Context
-    - name: OTEL_PROPAGATORS
-      value: "vegas-legacy"
-    ```
+opencode run "Using the otel-instrumentation skill: in k8s/30-slots.yaml the slots \
+container sets OTEL_PROPAGATORS=\"vegas-legacy\", so the frontend's W3C \
+tracecontext header is ignored and every slots_spin span arrives as an orphan \
+root trace. Change ONLY that one env value to \"tracecontext,baggage\" (the W3C \
+standard, which every other service already uses). Do not touch any other \
+service, env var, or file."
+```
 
-3. Change the value to the W3C propagators:
+## ③ Review — read the diff
 
-    ```yaml
-    - name: OTEL_PROPAGATORS
-      value: "tracecontext,baggage"
-    ```
+In build mode `opencode` writes the change straight into the working tree. **Read
+the diff before you commit** — it should be exactly one line:
 
-4. Commit the change (Gitea web editor: pencil icon → edit → commit).
+```diff
+     - name: OTEL_PROPAGATORS
+-      value: "vegas-legacy"
++      value: "tracecontext,baggage"
+```
 
-Argo CD picks up the commit and rolls the slots deployment. Watch it:
+```bash
+git diff
+```
+
+!!! warning "If the agent gets it wrong — steer it back"
+    - **Edits another file or another service**: *"only `k8s/30-slots.yaml`, only
+      the `OTEL_PROPAGATORS` value — revert anything else."*
+    - **Changes the propagator to something exotic** (`b3`, `jaeger`): *"use
+      exactly `tracecontext,baggage` — the same value the other games use."*
+    - **Also rewrites the SDK code** (`services/common/propagators.js` is not in
+      this repo — the manifests are): *"this repo holds only `k8s/` manifests;
+      the fix is the env var, nothing else."*
+
+    Re-run `opencode` with the correction rather than hand-editing — the verify
+    checkpoint at the end tells you when the agent is done.
+
+## ④ Apply — branch → PR in Gitea → merge → Argo CD sync
+
+The `casino` namespace is GitOps-owned, so app-manifest fixes go through Git —
+and through a **pull request**, exactly like production:
+
+```bash
+git add k8s/30-slots.yaml
+git commit -m "fix(slots): propagate W3C tracecontext so slots joins the trace"
+git push -u origin fix/slots-w3c-propagators
+```
+
+1. Open Gitea at http://localhost:30001 → repo `casino/casino` → **Pull requests
+   → New pull request**: base `main` ← compare `fix/slots-w3c-propagators`.
+2. Create the PR, read it once (one-line diff), then **Merge** it.
+3. Argo CD picks up the merge on `main` and rolls the slots deployment — hit
+   **Refresh** in the Argo CD UI (http://localhost:30002) to force it, then watch:
 
 ```bash
 kubectl -n casino rollout status deploy/vegas-casino-slots
 ```
 
-## Dynatrace check
+## ⑤ Verify — Dynatrace check
 
 1. Play a few slots rounds (or wait ~1 minute for the k6 load generator).
 2. Re-run the hunt query in your Notebook — now over a short, **recent** window and
@@ -166,8 +212,11 @@ the slots span — no proprietary header, clean W3C parentage.
       (inject/extract format mismatch)
 - [ ] You can name the config surface that fixes it (`OTEL_PROPAGATORS` on the
       SDK, owned by the workload's manifest)
-- [ ] You fixed it via a Git commit, not a `kubectl` patch
-- [ ] After the fix, the scoped DQL shows `reconnected` climbing and `orphaned`
-      falling to ~0 — connected frontend → slots traces in Dynatrace
+- [ ] You drove `opencode` (`otel-instrumentation` skill) to produce the fix,
+      reviewed the diff, and landed it via **branch → PR in Gitea → merge** —
+      not a `kubectl` patch, not a hand edit
+- [ ] After Argo CD synced the merge, the scoped DQL shows `reconnected`
+      climbing and `orphaned` falling to ~0 — connected frontend → slots
+      traces in Dynatrace
 
 Next: [M2 — SDK configuration by file](module-2.md).

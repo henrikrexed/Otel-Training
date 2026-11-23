@@ -1,7 +1,17 @@
 # M0 — Environment Setup
 
 **Goal:** Codespace up, cluster healthy, Dynatrace connected, casino deployed,
-and you can play the casino. Budget 15 minutes; helpers circulate.
+`opencode` authenticated **with the observability skills installed**, and you
+can play the casino. Budget 20 minutes; helpers circulate.
+
+!!! info "Every module M1–M5 drives the `opencode` AI agent"
+    This workshop is **opencode-first**: you never hand-author a fix from a
+    blank file — you observe the symptom in Dynatrace, drive `opencode` to
+    produce the fix, review the diff, apply it (Gitea PR → Argo CD for app
+    manifests, `kubectl apply` for the collector), and verify with DQL. M0
+    makes sure the agent and its skills actually work before M1 needs them.
+    The pattern is the **Problem → Opencode → Review → Apply → Verify** loop
+    introduced at the end of this page and reused by every module.
 
 ## 1. Start the Codespace
 
@@ -40,23 +50,90 @@ PARTICIPANT_ID
     neighbor's. (Advanced: `KIND_CLUSTER_NAME` overrides it if you ever need to
     name the cluster directly; most attendees never set it.)
 
-!!! tip "Advanced track only: check `opencode` works"
-    The [advanced self-paced track](advanced/getting-started.md) drives the
-    `opencode` AI coding agent, wired at start-up to a facilitator-hosted LLM
-    proxy. If you are on that track and set the two `WORKSHOP_*` secrets, confirm
-    the agent and its proxy credential are in place:
+### Check `opencode` and its proxy auth
+
+The `opencode` AI coding agent is baked into the Codespace image and wired at
+start-up to the facilitator-hosted LLM proxy (the two `WORKSHOP_*` secrets
+below). Every module from M1 on drives it, so confirm it is alive now:
+
+```bash
+opencode --version                 # the CLI is baked into the image
+test -f .workshop-llm.env && echo "proxy credential minted" || \
+  echo "no proxy credential — re-run: bash .devcontainer/bootstrap/dispense-llm.sh"
+opencode run "reply with the word READY"   # should return a model completion
+```
+
+If that last command hangs or errors, the proxy key was not minted — jump to
+[Troubleshooting → Workshop LLM proxy](troubleshooting.md#workshop-llm-proxy-opencode)
+before going further. Nothing in M1–M5 works until `opencode run` returns a
+completion.
+
+### Install the observability skills
+
+Agent Skills are what let `opencode` reason correctly about Dynatrace and
+OpenTelemetry instead of guessing. After the `opencode` auth check above,
+install the observability skill set and verify it loaded:
+
+```bash
+npx skills add henrikrexed/observability-agent-skills@v1.0.0
+opencode debug skill | grep -E 'otel-|dt-|dtctl'
+```
+
+You are looking for the three families in that output:
+
+| Family | Prefix | What it gives the agent |
+|---|---|---|
+| Dynatrace-for-AI | `dt-*` | DQL syntax, observability patterns, topology |
+| OpenTelemetry | `otel-*` | `otel-instrumentation`, `otel-ottl`, `otel-collector`, `otel-dynatrace`, … |
+| dtctl | `dtctl` | Driving the `dtctl` CLI to read and apply Dynatrace config |
+
+!!! warning "If a family is missing — install it, don't skip it"
+    The skill install is **non-fatal** at bootstrap, so a GitHub blip can leave a
+    set out. Re-run the idempotent bootstrap installer and re-verify until the
+    grep shows `otel-`, `dt-` and `dtctl`:
 
     ```bash
-    opencode --version                 # the CLI is baked into the image
-    test -f .workshop-llm.env && echo "proxy credential minted" || \
-      echo "no proxy credential — re-run: bash .devcontainer/bootstrap/dispense-llm.sh"
-    opencode run "reply with the word READY"   # should return a model completion
+    bash .devcontainer/bootstrap/install-opencode-skills.sh   # bootstrap fallback (owned by DevOps, ISI-7563)
+    bash .devcontainer/bootstrap/verify-opencode-skills.sh    # exit 0 = opencode + all three sets loadable
+    opencode debug skill | grep -E 'otel-|dt-|dtctl'
     ```
 
-    No `.workshop-llm.env`? Post-create setup skipped the dispense because the
-    `WORKSHOP_*` secrets were absent, or the dispenser was unreachable — see
-    [Troubleshooting](troubleshooting.md#workshop-llm-proxy-opencode). The M0–M5
-    modules do **not** need `opencode`, so you can ignore this on the main track.
+    Both land in `~/.config/opencode/skills/`. Do not continue to M1 until the
+    grep prints matches.
+
+### The agent loop you will use all day
+
+Every module from here on follows **one** canonical pattern —
+**① Problem → ② Opencode → ③ Review → ④ Apply → ⑤ Verify**. You never
+hand-author the fix from a blank file: you observe the symptom in Dynatrace,
+then drive `opencode` with a **copy-pasteable prompt** that names the **goal**,
+the **target file**, and the **skill** to lean on. Learn the loop once here;
+every module is a variation on it.
+
+```mermaid
+flowchart LR
+  p["① Problem<br/>see the symptom in Dynatrace<br/>(orphan spans, PII, climbing series)"] --> o["② Opencode<br/>prompt: goal + target file + skill"]
+  o --> r["③ Review<br/>read the diff it produces"]
+  r --> a["④ Apply<br/>app manifest → branch → PR in Gitea → merge → Argo sync<br/>collector → kubectl apply"]
+  a --> v["⑤ Verify<br/>re-run the DQL checkpoint"]
+  v -. "not fixed? steer it back" .-> o
+```
+
+**Apply differs by target.** App manifests (`k8s/*.yaml` in your Gitea repo
+`casino/casino`) are GitOps-owned: Argo CD `selfHeal` reverts hand-drift, so
+you fix them with **branch → commit → push → PR in Gitea → merge**, and Argo CD
+syncs `main` (hit **Refresh** at http://localhost:30002 to force it). Collector
+config (`observability/collectors/gateway.yaml` in your Codespace repo) is
+**not** Argo-managed: validate offline, then `kubectl apply` it directly.
+
+!!! tip "When the agent gets it wrong — steer it back, don't hand-fix"
+    `opencode` is not deterministic. If the diff misses a field, puts a
+    processor in the wrong order, or invents a name, **reply with the specific
+    correction** rather than editing by hand — e.g. *"`memory_limiter` must
+    stay the first processor; put your new processor after `k8sattributes`."*
+    Steering the agent is the skill this workshop teaches; the DQL checkpoint
+    tells you when it is done. Every module includes an *"if the agent gets it
+    wrong"* note with the exact one-line corrections for that step.
 
 ## Environment variables
 
@@ -118,13 +195,14 @@ it is **derived from `DT_TENANT`** (`<id>.live.…` → `<id>.apps.…`).
 live authenticated call, so a bad token or missing scope fails there, loudly,
 instead of mid-lab.
 
-Two variables below are **not** Dynatrace tokens — they belong to the advanced
-track's `opencode` LLM dispenser (unrelated to the DT tenant):
+Two variables below are **not** Dynatrace tokens — they belong to the `opencode`
+LLM dispenser (unrelated to the DT tenant). They are **required from M0 on**:
+M0–M5 are opencode-first, and the agent is useless without its proxy key.
 
 | Variable | Type | Consumed by | Required? |
 |---|---|---|---|
-| `WORKSHOP_DISPENSER_URL` | URL | `dispense-llm.sh` → `opencode` LLM proxy key | Optional (advanced Step 1 only) |
-| `WORKSHOP_ROOM_PASSWORD` | shared secret (`X-Room-Password`) | `dispense-llm.sh` → dispenser auth | Optional (advanced Step 1 only) |
+| `WORKSHOP_DISPENSER_URL` | URL | `dispense-llm.sh` → `opencode` LLM proxy key | Required for the M0–M5 opencode loop |
+| `WORKSHOP_ROOM_PASSWORD` | shared secret (`X-Room-Password`) | `dispense-llm.sh` → dispenser auth | Required for the M0–M5 opencode loop |
 
 !!! info "Davis CoPilot / OAuth (optional, not required)"
     If your cohort runs the optional **Davis CoPilot** exercise it uses a separate
@@ -302,9 +380,10 @@ bash gitops/bootstrap/bootstrap-gitops.sh
 
 ## 4. Open the GitOps loop
 
-Your lab mechanic for the whole session: **edit a manifest → commit → Argo CD
-deploys it**. No `kubectl apply` into the `casino` namespace (Argo CD's
-self-heal would revert it anyway).
+Your lab mechanic for the whole session: **branch → commit → push → PR in
+Gitea → merge → Argo CD deploys it** (M1 walks this end to end with `opencode`).
+No `kubectl apply` into the `casino` namespace (Argo CD's self-heal would
+revert it anyway).
 
 All three UIs are forwarded to your codespace and appear, labelled, in the
 **Ports** panel (`Casino app` → 30000, `Git host` → 30001, `Argo CD UI` → 30002):
@@ -328,9 +407,11 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 > 30001 — open your GitLab fork's web URL instead (printed in the GitOps
 > bootstrap banner). Ports 30000 (casino) and 30002 (Argo CD) are unchanged.
 
-1. Open Gitea at http://localhost:30001 and sign in.
-2. Find the repo `casino/casino` — it contains the Kubernetes manifests for
-   the `casino` namespace. This is where you will fix defects.
+1. Open Gitea at http://localhost:30001 and sign in (`attendee` /
+   `trainingpass123`).
+2. Find the repo `casino/casino` — it contains the Kubernetes manifests under
+   `k8s/` for the `casino` namespace. This is where you will fix defects —
+   on a branch, via a pull request (M1 shows the full loop).
 3. Open Argo CD at http://localhost:30002 — the `casino` Application shows
    `Healthy` / `Synced`.
 
@@ -411,6 +492,8 @@ that broke.
 
 - [ ] `kubectl get nodes` shows one Ready node
 - [ ] All pods Running in `casino`, `observability`, `dynatrace`, `gitea`, `argocd`
+- [ ] `opencode run "reply with the word READY"` returns a completion (proxy auth works)
+- [ ] `npx skills add henrikrexed/observability-agent-skills@v1.0.0` ran (or the bootstrap installer fallback), and `opencode debug skill | grep -E 'otel-|dt-|dtctl'` prints the three skill families
 - [ ] The scoped `fetch spans | filter k8s.cluster.name == "<PARTICIPANT_ID>"` query returns your casino services in Dynatrace
 - [ ] Gitea reachable at http://localhost:30001, repo `casino/casino` visible
 - [ ] Casino UI reachable at http://localhost:30000 and you played a round

@@ -38,9 +38,13 @@ your case is not here.
 
 ## Workshop LLM proxy (opencode)
 
-Only relevant on the advanced track Step 1, which drives the `opencode` CLI
-against a facilitator-hosted LLM proxy. The credential is minted at start-up by
-`dispense-llm.sh` into a gitignored `.workshop-llm.env`.
+M0–M5 are opencode-first: every module drives the `opencode` CLI against a
+facilitator-hosted LLM proxy, with the observability Agent Skills installed
+(M0). The proxy credential is minted at start-up by `dispense-llm.sh` into a
+gitignored `.workshop-llm.env`; the skills land in
+`~/.config/opencode/skills/` (install with
+`npx skills add henrikrexed/observability-agent-skills@v1.0.0`, or the
+bootstrap fallback `bash .devcontainer/bootstrap/install-opencode-skills.sh`).
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -49,6 +53,7 @@ against a facilitator-hosted LLM proxy. The credential is minted at start-up by
 | `opencode run` fails with a quota / budget / 429 error | Your per-attendee budget on the proxy is exhausted (enforced server-side) | Ask the facilitator to top up or reset your key; the budget is **not** something you set locally |
 | `opencode run` says no provider / model configured | `~/.config/opencode/opencode.json` not written (dispense skipped) or env not sourced | Re-run `bash .devcontainer/bootstrap/dispense-llm.sh`, then `source .workshop-llm.env` (new terminals source it automatically via `~/.bashrc`) |
 | `opencode: command not found` | Image predates opencode, or install was skipped | `FORCE=1 bash .devcontainer/bootstrap/install-tools.sh` to re-install |
+| `opencode debug skill \| grep -E 'otel-\|dt-\|dtctl'` prints nothing | Skill set missing (bootstrap install is non-fatal) | `npx skills add henrikrexed/observability-agent-skills@v1.0.0`, or the idempotent fallback `bash .devcontainer/bootstrap/install-opencode-skills.sh`; then `bash .devcontainer/bootstrap/verify-opencode-skills.sh` must exit 0 |
 
 ## The one debug loop that solves most of it
 

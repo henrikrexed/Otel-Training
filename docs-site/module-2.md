@@ -1,7 +1,12 @@
 # M2 — SDK configuration by file: declarative config
 
 **Goal:** take the Java Scoring Service from code-first SDK configuration to a
-declarative `otel-config.yaml`, injected with zero code changes. 30 minutes.
+declarative `otel-config.yaml`, injected with zero code changes — produced by
+`opencode` (the `otel-instrumentation` skill), reviewed as a diff, and landed
+through the same Gitea PR → Argo CD loop as M1. 30 minutes.
+
+Same agent loop as [M1](module-1.md): **① Problem → ② Opencode → ③ Review →
+④ Apply (Gitea PR → Argo) → ⑤ Verify**.
 
 ## Concepts (5 min)
 
@@ -38,15 +43,41 @@ now in Dynatrace:
 Want to change the sampler? Rebuild the jar. Want logs? Write Java. This is
 the anti-pattern the declarative file replaces.
 
+## ① Problem — what the code-first config costs you (observed above)
+
+Recap of the symptom you can already see in Dynatrace: traces flow from
+`vegas-scoring-service`, but there are **no JVM metrics** and **no logs** —
+the programmatic `OpenTelemetryConfig.java` never wired a meter or logger
+provider. The fix surface is a declarative file, not a rebuild.
+
 ## The lab: zero-code instrumentation via the operator
 
 Your cluster runs the OpenTelemetry Operator (namespace `observability`). It
 can inject the Java agent into any workload — no Dockerfile change, no code.
 
-### Step 1 — create the config and the Instrumentation CR
+### ② Step 1 — opencode creates the config and the Instrumentation CR
 
-In Gitea, repo `casino/casino`, create a new file **`21-scoring-otel.yaml`**
-(**Add file → New file**) with:
+Clone your Gitea repo (from M1) and cut a branch if you merged and cleaned up:
+
+```bash
+cd ~/casino
+git switch -c feat/scoring-declarative-config
+
+opencode run "Using the otel-instrumentation skill (declarative SDK configuration): \
+create k8s/21-scoring-otel.yaml with (1) a ConfigMap scoring-otel-config holding \
+otel-config.yaml — file_format \"1.1\"; resource attributes service.name=vegas-scoring-service, \
+service.namespace=vegas-casino plus host/process/container detectors; composite propagator \
+tracecontext + baggage; tracer_provider with a parent_based(always_on) sampler and a batch \
+processor exporting OTLP to http://otel-gateway-collector.observability.svc.cluster.local:4317 \
+(tls insecure: true); a meter_provider with a periodic reader to the same endpoint; and a \
+logger_provider with a batch processor to the same endpoint. (2) an Instrumentation CR \
+casino-java whose java.env sets OTEL_CONFIG_FILE=/etc/otel/otel-config.yaml. Do not rely on \
+any bare OTEL_* env var — in file mode only ${VAR} references inside the file are honored."
+```
+
+### ③ Review — the diff should converge on this shape
+
+**Read the file the agent produced before you commit.** The target shape:
 
 ```yaml
 apiVersion: v1
@@ -128,43 +159,62 @@ Note what the file does **not** contain: any of the `OTEL_*` env vars from the
 deployment. If we needed one, it would have to appear as `${VAR}` inside the
 file to be honored at all.
 
-Commit the file.
+!!! warning "If the agent gets it wrong — steer it back"
+    - **Drops the meter or logger provider**: *"the whole point is JVM metrics
+      and logs — all three providers (tracer, meter, logger) must export via
+      OTLP to the gateway."*
+    - **Points the exporter at Dynatrace directly**: *"apps export to
+      `otel-gateway-collector.observability.svc.cluster.local:4317`, never
+      straight to the tenant."*
+    - **Relies on bare env vars**: *"file mode ignores env vars unless the file
+      references them as ${VAR} — keep the endpoint literal in the file."*
 
-### Step 2 — wire the scoring deployment to the agent and the file
+### ② Step 2 — opencode wires the scoring deployment to the agent and the file
 
-Edit `20-scoring.yaml` in the same repo. Three changes:
+Same branch, same agent — the prompt names the target file and the three
+changes:
 
-1. Add the injection annotation to the **pod template** metadata (the
-   `template.metadata.annotations` block — create it if missing):
+```bash
+opencode run "Using the otel-instrumentation skill: in k8s/20-scoring.yaml, wire the \
+scoring Deployment to the Java zero-code agent and the config file — add pod-template \
+annotation instrumentation.opentelemetry.io/inject-java: \"casino-java\" (create the \
+annotations block if missing), container env OTEL_CONFIG_FILE=/etc/otel/otel-config.yaml, \
+container volumeMount scoring-otel-config at /etc/otel (readOnly: true), and pod volume \
+scoring-otel-config from ConfigMap scoring-otel-config. Change nothing else in the file."
+```
 
-    ```yaml
-    instrumentation.opentelemetry.io/inject-java: "casino-java"
-    ```
+Review the diff — it should be exactly those three additions (the annotation, the
+env var, the mount + volume):
 
-2. Add the env var pointing at the mounted file, in the container env block:
+```yaml
+# template.metadata.annotations:
+instrumentation.opentelemetry.io/inject-java: "casino-java"
+# container env:
+- name: OTEL_CONFIG_FILE
+  value: /etc/otel/otel-config.yaml
+# container:
+volumeMounts:
+  - name: scoring-otel-config
+    mountPath: /etc/otel
+    readOnly: true
+# pod spec:
+volumes:
+  - name: scoring-otel-config
+    configMap:
+      name: scoring-otel-config
+```
 
-    ```yaml
-    - name: OTEL_CONFIG_FILE
-      value: /etc/otel/otel-config.yaml
-    ```
+### ④ Apply — commit → push → PR in Gitea → merge → Argo CD sync
 
-3. Mount the ConfigMap — add to the container `volumeMounts` and the pod
-   `volumes`:
+```bash
+git add k8s/21-scoring-otel.yaml k8s/20-scoring.yaml
+git commit -m "feat(scoring): declarative otel-config.yaml via zero-code agent"
+git push -u origin feat/scoring-declarative-config
+```
 
-    ```yaml
-    # container:
-    volumeMounts:
-      - name: scoring-otel-config
-        mountPath: /etc/otel
-        readOnly: true
-    # pod spec:
-    volumes:
-      - name: scoring-otel-config
-        configMap:
-          name: scoring-otel-config
-    ```
-
-Commit. Argo CD syncs; watch the rollout:
+Open the PR in Gitea (http://localhost:30001 → `casino/casino` → **Pull requests**
+→ base `main` ← `feat/scoring-declarative-config`), review the two-file diff,
+**Merge**. Argo CD syncs; watch the rollout:
 
 ```bash
 kubectl -n casino rollout status deploy/vegas-casino-scoring
@@ -176,7 +226,7 @@ kubectl -n casino get pods -l app.kubernetes.io/name=vegas-casino -o name | grep
      ConfigMap (the `|` block) are the usual suspect — check the Argo CD app
      status at http://localhost:30002 before you debug anything else.
 
-### Step 3 — verify in Dynatrace
+### ⑤ Step 3 — verify in Dynatrace
 
 Give it a minute, then with your cluster filter:
 
@@ -200,7 +250,9 @@ Give it a minute, then with your cluster filter:
 
 - [ ] You can explain the three config surfaces and when each wins
 - [ ] You can state the env-var rule for file mode without looking it up
-- [ ] `21-scoring-otel.yaml` committed: ConfigMap + Instrumentation CR
+- [ ] `opencode` produced `k8s/21-scoring-otel.yaml` (ConfigMap + Instrumentation CR)
+      and the `k8s/20-scoring.yaml` wiring; you reviewed the diff and landed it
+      via PR in Gitea → merge → Argo CD
 - [ ] JVM metrics and logs from `vegas-scoring-service` visible in Dynatrace
 - [ ] Traces still connected end-to-end
 

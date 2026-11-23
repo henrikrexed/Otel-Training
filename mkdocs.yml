@@ -71,8 +71,8 @@ nav:
   - M1 — Tour the broken casino: module-1.md
   - M2 — SDK configuration by file: module-2.md
   - M3 — The collector as control point: module-3.md
-  - "M4 — Sampling: cost/fidelity strategy": module-4.md
-  - M5 — Operating at scale: module-5.md
+  - "M4 — Sampling + cost attribution: cost/fidelity strategy": module-4.md
+  - "M5 — Operating at scale + OpAMP/BindPlane fleet management": module-5.md
   - Troubleshooting: troubleshooting.md
   # Option A (ISI-6913): new advanced self-paced track ALONGSIDE M0–M5.
   # Opencode-first rewrite (ISI-7564): Problem → Opencode → Verify loop,
