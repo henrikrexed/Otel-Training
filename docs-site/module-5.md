@@ -34,13 +34,15 @@ skill:
 
 ```bash
 opencode run "Using the otel-collector skill: in observability/collectors/gateway.yaml, \
-size the gateway for a bad day — raise the otlp_http exporter sending_queue queue_size to \
-50000 (it holds UNBATCHED requests, so size it generously), keep retry_on_failure, keep \
-memory_limiter first with limit_mib 400, and keep sending_queue.batch as the only batching. \
-Change nothing else."
+size the gateway for a bad day — on the otlphttp/dynatrace exporter, raise sending_queue \
+queue_size from 512 to 50000 (the queue buffers requests while retry_on_failure resends, \
+so size it generously); keep num_consumers 4 and retry_on_failure unchanged. Leave batching \
+exactly as shipped (batch processor, last in every pipeline; plain sending_queue, no \
+sending_queue.batch) and keep memory_limiter first with limit_mib 400. Change nothing else."
 ```
 
-Review the diff, then the config-as-product discipline:
+Review the diff — it should be a single-line change (`queue_size: 512` → `queue_size: 50000`) —
+then the config-as-product discipline:
 
 ```bash
 bash observability/validate.sh
@@ -49,10 +51,13 @@ kubectl -n observability rollout status deploy/otel-gateway-collector
 ```
 
 !!! warning "If the agent gets it wrong — steer it back"
-    - **Adds a `batch` processor**: *"no batch processor — batching is
-      `sending_queue.batch` on the exporter only."*
-    - **Touches processor order**: *"memory_limiter stays first; enrichment
-      before filtering; nothing after the exporter."*
+    - **Touches batching** (drops `batch`, adds `sending_queue.batch`): *"the shipped gateway
+      batches with the `batch` processor, last — leave batching exactly as shipped; only
+      queue_size changes."*
+    - **Renames the exporter to `otlp_http`**: *"the exporter type is `otlphttp` (HTTP), defined
+      as `otlphttp/dynatrace` — `otlp_http` does not exist and the collector rejects the config."*
+    - **Touches processor order**: *"memory_limiter stays first, `batch` stays last; nothing
+      goes after the exporter."*
 
 ## Exercise A — deploy the OpAMP bridge and connect the collector to the BindPlane gateway
 
@@ -119,7 +124,8 @@ no leading v), endpoint ws://bindplane-gateway.observability.svc.cluster.local:4
 (keep the commented :3001 direct fallback), header Authorization: \${env:BINDPLANE_OPAMP_TOKEN}, \
 capabilities AcceptsRemoteConfig + ReportsEffectiveConfig + ReportsHealth (+ ReportsRemoteConfig), \
 and componentsAllowed allow-list: receivers [otlp], processors [transform, memory_limiter, redaction, \
-tail_sampling, filter], exporters [otlp_http]."
+tail_sampling, filter], exporters [otlphttp] — the allow-list matches component TYPES, and the \
+collector's exporter type is otlphttp (the instance is otlphttp/dynatrace), not otlp_http."
 ```
 
 ### ③ Review — check the safety rails in the diff

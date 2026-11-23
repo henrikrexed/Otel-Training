@@ -148,8 +148,9 @@ spec:
 
 !!! note "SDK `batch` ≠ Collector `batch`"
     The `batch` span/log processors in this file are part of the **SDK** and are not
-    deprecated. It is the *Collector's* `batch` processor that is deprecated — you will
-    see its replacement (exporter-level `sending_queue.batch`) in Module 3.
+    deprecated. The *Collector's* `batch` processor is deprecated, though — Module 3
+    shows the shipped gateway using it (last in every pipeline) and the migration path
+    to exporter-level `sending_queue.batch`.
 
 Read it before you commit — every block maps to a concept from M1: resource
 identity, propagation, per-signal pipelines (tracer / meter / logger

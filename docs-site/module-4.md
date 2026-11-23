@@ -88,8 +88,8 @@ num_traces: 50000) with policies keep-errors (status_code ERROR), keep-slow (lat
 baseline (probabilistic sampling_percentage: 10), placed after filter/noise in the traces pipeline; \
 (c) add a spanmetrics connector (explicit histogram buckets [5ms,10ms,25ms,50ms,100ms,250ms,500ms,1s,2.5s,5s,10s], \
 dimensions http.method + http.route, exemplars enabled) and wire it both ways: traces pipeline exporters \
-[otlp_http/dynatrace, spanmetrics], metrics pipeline receivers [otlp, spanmetrics]. Keep memory_limiter \
-first on every pipeline and do NOT add a batch processor."
+[otlphttp/dynatrace, spanmetrics], metrics pipeline receivers [otlp, spanmetrics]. Keep memory_limiter \
+first and batch LAST on every pipeline; do not touch batching (no sending_queue.batch)."
 ```
 
 ### ③ Review — the diff should converge on:
@@ -159,25 +159,30 @@ And wire both sides — traces export into it, metrics read from it:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, filter/noise, tail_sampling]
-          exporters: [otlp_http/dynatrace, spanmetrics]
+          processors: [memory_limiter, k8sattributes, filter/noise, tail_sampling, batch]
+          exporters: [otlphttp/dynatrace, spanmetrics]
         metrics:
           receivers: [otlp, spanmetrics]
-          processors: [memory_limiter, k8sattributes, transform/drop_player_id, cumulative_to_delta]
-          exporters: [otlp_http/dynatrace]
+          processors: [memory_limiter, k8sattributes, transform/drop_player_id, cumulativetodelta, batch]
+          exporters: [otlphttp/dynatrace]
 ```
 
-*(If you skipped the M3 stretch, your metrics processors simply will not have
-`transform/drop_player_id`. Keep the rest of your own file's lists.)*
+*(If you skipped the M3 exercise, your metrics processors simply will not have
+`transform/drop_player_id`. Keep the rest of your own file's lists — including
+`batch` last.)*
 
 !!! warning "If the agent gets it wrong — steer it back"
-    - **tail_sampling before filter/noise, or before k8sattributes**: *"order in
-      the traces pipeline must be `memory_limiter, k8sattributes, filter/noise,
-      tail_sampling` — enrichment first, then drop noise, then sample."*
+    - **tail_sampling before filter/noise, before k8sattributes, or after `batch`**: *"order
+      in the traces pipeline must be `memory_limiter, k8sattributes, filter/noise,
+      tail_sampling, batch` — enrichment first, then drop noise, then sample, batch
+      last."*
     - **spanmetrics not wired both ways**: *"traces pipeline must export to
       `spanmetrics` AND metrics pipeline must receive from `spanmetrics`."*
-    - **Adds a `batch` processor**: *"no batch processor — batching stays on the
-      exporter's `sending_queue.batch`."*
+    - **Touches batching** (drops `batch`, adds `sending_queue.batch`): *"the shipped
+      gateway batches with the `batch` processor, last — leave batching as shipped."*
+    - **Renames the exporter to `otlp_http`**: *"the exporter type is `otlphttp`
+      (HTTP), defined as `otlphttp/dynatrace` — `otlp_http` does not exist and the
+      collector rejects the config."*
 
 ### ④ 3d. Validate, apply, verify
 
@@ -223,8 +228,9 @@ Pick the id that will identify your team's ingest in the shared tenant — your
 `PARTICIPANT_ID` keeps it unique in class:
 
 ```bash
-export COST_CENTER_ID="casino-${PARTICIPANT_ID}"     # e.g. casino-jdoe-42
-echo "$COST_CENTER_ID"
+export COST_CENTER="casino-${PARTICIPANT_ID}"        # e.g. casino-jdoe-42
+export COST_PRODUCT="vegas-casino"                   # same names as labs/advanced/step3-cost-center/
+echo "$COST_CENTER / $COST_PRODUCT"
 ```
 
 ### ② Opencode — wire the cost center into the gateway pipeline
@@ -241,12 +247,14 @@ variant):
 ```bash
 opencode run "Using the otel-collector and otel-ottl skills: in \
 observability/collectors/gateway.yaml add a resource/costcenter processor that upserts \
-the RESOURCE attributes dt.cost.costcenter = '\${env:COST_CENTER_ID}' and \
-dt.cost.product = 'vegas-casino' (attributes action upsert, like \
-labs/advanced/step3-cost-center/cost-center-processor.yaml). Add env var COST_CENTER_ID with \
-the literal value '$COST_CENTER_ID' to the collector CR spec.env. Reference resource/costcenter \
-in ALL THREE pipelines (traces, metrics, logs) right after k8sattributes — e.g. traces: \
-[memory_limiter, k8sattributes, resource/costcenter]. Keep memory_limiter first; no batch processor."
+the RESOURCE attributes dt.cost.costcenter = '\${env:COST_CENTER}' and \
+dt.cost.product = '\${env:COST_PRODUCT}' (attributes action upsert, exactly like \
+labs/advanced/step3-cost-center/cost-center-processor.yaml). Add env vars COST_CENTER and \
+COST_PRODUCT with the literal values '$COST_CENTER' and '$COST_PRODUCT' to the collector CR \
+spec.env. Reference resource/costcenter in ALL THREE pipelines (traces, metrics, logs) right \
+after k8sattributes, before any other processor — e.g. traces: \
+[memory_limiter, k8sattributes, resource/costcenter, batch]. Keep memory_limiter first and \
+batch last; do not touch batching."
 ```
 
 ### ③ Review — the diff should converge on:
@@ -256,27 +264,29 @@ in ALL THREE pipelines (traces, metrics, logs) right after k8sattributes — e.g
       resource/costcenter:
         attributes:
           - key: dt.cost.costcenter
-            value: ${env:COST_CENTER_ID}     # e.g. "casino-jdoe-42"
+            value: ${env:COST_CENTER}        # e.g. "casino-jdoe-42"
             action: upsert
           - key: dt.cost.product
-            value: vegas-casino
+            value: ${env:COST_PRODUCT}       # "vegas-casino"
             action: upsert
 ```
 
 ```yaml
     service:
       pipelines:
-        traces:  { processors: [memory_limiter, k8sattributes, resource/costcenter] }
-        metrics: { processors: [memory_limiter, k8sattributes, resource/costcenter, cumulative_to_delta] }
-        logs:    { processors: [memory_limiter, k8sattributes, resource/costcenter] }
+        traces:  { processors: [memory_limiter, k8sattributes, resource/costcenter, batch] }
+        metrics: { processors: [memory_limiter, k8sattributes, resource/costcenter, cumulativetodelta, batch] }
+        logs:    { processors: [memory_limiter, k8sattributes, resource/costcenter, batch] }
 ```
 
 Plus in the CR's `spec.env`:
 
 ```yaml
     env:
-      - name: COST_CENTER_ID
+      - name: COST_CENTER
         value: casino-<PARTICIPANT_ID>     # your id from step ①
+      - name: COST_PRODUCT
+        value: vegas-casino
 ```
 
 !!! warning "If the agent gets it wrong — steer it back"
@@ -287,9 +297,12 @@ Plus in the CR's `spec.env`:
       `dt.cost.costcenter` / `dt.cost.product` — stamp those exact keys."*
     - **Only tags traces**: *"wire `resource/costcenter` into metrics and logs
       too — allocation must cover all ingest."*
-    - **Forgets the env var in `spec.env`**: *"`${env:COST_CENTER_ID}` resolves
-      from the collector container env — add `COST_CENTER_ID` to `spec.env`, or
-      the attribute lands empty."*
+    - **Forgets the env vars in `spec.env`**: *"`${env:COST_CENTER}` /
+      `${env:COST_PRODUCT}` resolve from the collector container env — add both
+      to `spec.env`, or the attributes land empty."*
+    - **Places it after `batch`**: *"enrichment belongs before mutation ends —
+      `resource/costcenter` goes right after `k8sattributes`, `batch` stays
+      last."*
 
 ### ④ Apply — validate, kubectl apply
 

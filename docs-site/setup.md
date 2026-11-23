@@ -130,10 +130,11 @@ config (`observability/collectors/gateway.yaml` in your Codespace repo) is
     `opencode` is not deterministic. If the diff misses a field, puts a
     processor in the wrong order, or invents a name, **reply with the specific
     correction** rather than editing by hand — e.g. *"`memory_limiter` must
-    stay the first processor; put your new processor after `k8sattributes`."*
-    Steering the agent is the skill this workshop teaches; the DQL checkpoint
-    tells you when it is done. Every module includes an *"if the agent gets it
-    wrong"* note with the exact one-line corrections for that step.
+    stay the first processor and `batch` the last; put your new processor after
+    `k8sattributes`."* Steering the agent is the skill this workshop teaches;
+    the DQL checkpoint tells you when it is done. Every module includes an
+    *"if the agent gets it wrong"* note with the exact one-line corrections for
+    that step.
 
 ## Environment variables
 

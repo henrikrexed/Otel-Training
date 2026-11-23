@@ -26,17 +26,19 @@ Why this order, one sentence each:
 - `memory_limiter` **first** — shed load before spending memory on it.
 - **Enrichment before filtering** — you cannot filter on an attribute you have
   not added yet.
-- **Batch in the exporter, not in a processor** — the `batch` processor is deprecated; batching
-  now happens once, after all mutation, inside the exporter's `sending_queue` (see the note below).
+- **Batch last** — the `batch` processor runs once, after all mutation, just
+  before the exporter (see the note below on its deprecation).
 
-!!! note "Why there is no `batch` processor"
+!!! note "The `batch` processor is deprecated — but it is what ships today"
     The Collector's `batch` processor is **deprecated** and is planned for removal from the core
     distributions in `v0.177.0` (May 2027); exporter-level batching becomes the default in
-    `v0.171.0` (February 2027). Batching now lives in the exporter's `sending_queue`:
+    `v0.171.0` (February 2027). **Your shipped `gateway.yaml` still uses the `batch`
+    processor (last in every pipeline) plus a plain `sending_queue` — no
+    `sending_queue.batch` yet.** When you migrate, batching moves into the exporter:
 
     ```yaml
     exporters:
-      otlp_http/dynatrace:
+      otlphttp/dynatrace:
         sending_queue:
           enabled: true
           sizer: items
@@ -55,7 +57,8 @@ Why this order, one sentence each:
     now holds unbatched requests, so the old `queue_size` can overflow sooner. If you
     genuinely need batching *between* processors (e.g. before an aggregation processor),
     the `queue_batch` processor takes the same settings. Do not run both a `batch`
-    processor and `sending_queue.batch`. Details:
+    processor and `sending_queue.batch`. Until then, the rule for this lab is:
+    **new processors go before `batch`, never after it.** Details:
     [Migrating from the batch processor](https://opentelemetry.io/blog/2026/collector-batching-migration/).
 
     This is a **Collector** change only. The SDK `batch` span/log processors used in
@@ -84,10 +87,13 @@ answer** for processor order:
 - `k8sattributes` — enrichment: attaches `k8s.pod.name`, `k8s.namespace.name`,
   and friends (it can do this because the DaemonSet forwards pod metadata and
   the gateway runs in-cluster)
-- `cumulative_to_delta` — **metrics pipeline only**: counters arrive cumulative,
+- `cumulativetodelta` — **metrics pipeline only**: counters arrive cumulative,
   Dynatrace wants rates
-- **no `batch` processor** — batching is configured on the `otlp_http` exporter
-  (`sending_queue.batch`), which exports to your Dynatrace tenant
+- `batch` **last**, on every pipeline — mutation is done by then
+- the exporter is `otlphttp/dynatrace` (OTLP over **HTTP** — Dynatrace's ingest
+  is an HTTP endpoint; `otlp_http` is not a valid exporter type), with
+  `sending_queue` (queue_size 512, num_consumers 4) + `retry_on_failure`,
+  exporting to your Dynatrace tenant
 
 You will edit this file in the exercises. The discipline around it is
 **config-as-product**: edit in Git → validate offline → apply → verify. Never
@@ -167,8 +173,8 @@ observability/collectors/gateway.yaml add a transform/drop_player_id processor \
 (error_mode: ignore) whose metric_statements delete the datapoint attribute \
 \"player_id\" (context: datapoint, delete_key(attributes, \"player_id\")), and \
 reference it in the metrics pipeline right after k8sattributes and before \
-cumulative_to_delta. Keep memory_limiter first; do NOT add a batch processor \
-(batching is exporter-level sending_queue.batch). Change nothing else."
+cumulativetodelta. Keep memory_limiter first and batch LAST; do not touch \
+batching and do not add sending_queue.batch. Change nothing else."
 ```
 
 ### ③ Review — the diff should be exactly:
@@ -188,22 +194,24 @@ cumulative_to_delta. Keep memory_limiter first; do NOT add a batch processor \
       pipelines:
         metrics:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, transform/drop_player_id, cumulative_to_delta]
-          exporters: [otlp_http/dynatrace]
+          processors: [memory_limiter, k8sattributes, transform/drop_player_id, cumulativetodelta, batch]
+          exporters: [otlphttp/dynatrace]
 ```
 
 *(Keep the processor list already present in your file; the point is where the
-new one sits.)*
+new one sits — after enrichment, before `cumulativetodelta`, never after `batch`.)*
 
 !!! warning "If the agent gets it wrong — steer it back"
-    - **Puts the processor before `k8sattributes`**: *"it must run after
-      enrichment — place `transform/drop_player_id` after `k8sattributes`,
-      before `cumulative_to_delta`, with `memory_limiter` still first."*
+    - **Puts the processor before `k8sattributes` or after `batch`**: *"it must
+      run after enrichment — place `transform/drop_player_id` after
+      `k8sattributes`, before `cumulativetodelta`, with `memory_limiter` first
+      and `batch` last."*
     - **Drops the whole metric instead of the dimension**: *"delete only the
       `player_id` datapoint attribute — the `game` dimension and the histogram
       itself must survive."*
-    - **Adds a `batch` processor**: *"no batch processor — batching is
-      `sending_queue.batch` on the exporter; do not add one."*
+    - **Touches batching** (adds `sending_queue.batch`, removes `batch`): *"the
+      shipped gateway batches with the `batch` processor, last; leave batching
+      exactly as shipped."*
 
 ### ④ Apply — validate offline, then kubectl apply (config-as-product)
 
@@ -225,7 +233,7 @@ kubectl -n observability rollout status deploy/otel-gateway-collector
 
 ### ① Find it (Dynatrace)
 
-Register/login as your player at http://localhost:3000 — the UI you used in
+Register/login as your player at http://localhost:30000 — the UI you used in
 M0 — then in Dynatrace open **Logs** and filter `service.name =
 vegas-frontend-service`, search for `login_audit`.
 
@@ -295,7 +303,7 @@ opencode run "Using the otel-collector and otel-ottl skills: in \
 observability/collectors/gateway.yaml add a transform/drop_pii processor \
 (error_mode: ignore) with log_statements (context: log) that delete_key(attributes, \
 \"user.email\") and delete_key(attributes, \"client.ip\"), and reference it in the \
-logs pipeline right after k8sattributes. memory_limiter stays first; no batch processor."
+logs pipeline right after k8sattributes. memory_limiter stays first; batch stays last; do not touch batching."
 ```
 
 Then the same config-as-product discipline: `bash observability/validate.sh` →
