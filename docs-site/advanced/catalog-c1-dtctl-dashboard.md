@@ -147,4 +147,10 @@ timeseries bets = sum(casino.bets.count), by: { casino.outcome }, from: now() - 
 - [ ] Every tile renders data in Dynatrace
 - [ ] No credentials embedded in the document
 
+!!! tip "Next — the capstone"
+    This dashboard is one Dynatrace artifact shipped as code. The capstone
+    [D1 — Instrumentation Score](catalog-d1-instrumentation-score.md) ships a
+    telemetry **scorecard** the same `dtctl` way — grading the very signals this
+    dashboard charts.
+
 Back to the [catalog menu](catalog.md).

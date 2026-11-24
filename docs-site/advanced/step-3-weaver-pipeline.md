@@ -231,7 +231,10 @@ fetch spans
     emit that the registry does not declare. Wiring it against the lab's live
     collector is a documented stretch goal — it is **not verified in this lab** and
     is not part of the graded CI gate. Treat it as a next step if you want runtime
-    conformance on top of the build-time guard.
+    conformance on top of the build-time guard. For the **graded** runtime
+    counterpart, see the capstone
+    [D1 — Instrumentation Score](catalog-d1-instrumentation-score.md): Weaver
+    guards names at build time; D1 scores what the apps actually emit at runtime.
 
 ## Definition of done
 

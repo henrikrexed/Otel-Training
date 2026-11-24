@@ -161,4 +161,10 @@ filter: { span.name == "casino.slots.spin" }, from: now() - 7d
 - [ ] SLO `name` includes `PARTICIPANT_ID`; tags applied
 - [ ] Achieved availability + error budget read back via DQL
 
+!!! tip "Next — the capstone"
+    You committed to an SLO as code. The capstone
+    [D1 — Instrumentation Score](catalog-d1-instrumentation-score.md) extends the
+    same reflex to the telemetry itself — a deployed-as-code **scorecard** that
+    grades whether the signals feeding SLOs like this one are even trustworthy.
+
 Back to the [catalog menu](catalog.md).

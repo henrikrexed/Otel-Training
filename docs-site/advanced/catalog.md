@@ -49,3 +49,27 @@ to build:
     ([A2](catalog-a2-log-trace-correlation.md)) and a bounded dimension
     ([B4](catalog-b4-ottl-enrichment.md)) into one score, so do those first for a
     score that lands **Good → Excellent**.
+
+## Theme D — the capstone (observability of observability)
+
+Themes A–C each sharpen one muscle; **theme D closes the loop** by grading the
+telemetry itself. [D1 — Instrumentation Score](catalog-d1-instrumentation-score.md)
+is the workshop's **capstone**: it synthesises the instrumentation work from
+theme A and the "as-code" automation reflexes from theme C into a single,
+deployed-as-code **scorecard** for the casino's telemetry.
+
+- **Builds on theme A (the signals being graded):** `service.name` from
+  [Step 1](step-1-instrument-with-agents.md), ERROR span status from
+  [A4](catalog-a4-exceptions-span-events.md), log↔trace correlation from
+  [A2](catalog-a2-log-trace-correlation.md), and a bounded dimension from
+  [B4](catalog-b4-ottl-enrichment.md) — the four anchor rules each land because
+  of work you did earlier.
+- **Extends theme C (the "as-code" reflex):** where
+  [C1](catalog-c1-dtctl-dashboard.md) ships a dashboard,
+  [C2](catalog-c2-slo.md) an SLO and [C3](catalog-c3-metric-davis-alert.md) a
+  Davis alert — all via `dtctl` — D1 ships the **instrumentation score** the
+  same way, as a version-controlled Dynatrace artifact.
+- **Complements Step 3:** [Weaver](step-3-weaver-pipeline.md) is the
+  **build-time** guard that blocks drift before merge; D1 is the **runtime**
+  guard that scores what the apps actually emit. Read the
+  [concept](instrumentation-score-concept.md) first.

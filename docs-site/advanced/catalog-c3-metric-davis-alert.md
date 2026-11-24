@@ -167,4 +167,10 @@ looking green).
 - [ ] Validated (`--dry-run` exits 0), then created
 - [ ] Proven to fire: Davis problem opens on the induced outage and auto-closes
 
+!!! tip "Next — the capstone"
+    This Davis alert pages on bad behaviour. The capstone
+    [D1 — Instrumentation Score](catalog-d1-instrumentation-score.md) ships, the
+    same `dtctl` way, the **scorecard** that grades whether the telemetry an
+    alert like this depends on is complete and well-formed in the first place.
+
 Back to the [catalog menu](catalog.md).
