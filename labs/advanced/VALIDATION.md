@@ -213,3 +213,52 @@ kubectl -n casino scale deploy/vegas-casino-scoring --replicas=1   # recover
   builtin:anomaly-detection.metric-events` lists the alert.
 - Errors surface as ERROR spans most reliably once the **Catalog A4**
   exception/ERROR-status recording is in place.
+
+---
+
+## Catalog D1 — Instrumentation Score (per-service, as code)
+
+Four anchor rules, each a `pass_ratio` ∈ [0,1] over the last 30 min; weighted into
+one score per service: `score = Σ(weightᵢ × pass_ratioᵢ) / Σweightᵢ × 100`
+(weights 40/30/20/30 → Σ = 120; bands 90 / 75 / 50). The runtime guard that
+complements the Step-3 Weaver build-time guard.
+
+```dql
+# RES-001 service.name present (Critical w=40)
+fetch spans, from: now() - 30m
+| summarize total = count(), missing = countIf(isNull(service.name))
+| fieldsAdd pass_ratio = (total - missing) / total
+
+# SPA span status recorded on server spans (Important w=30) — builds on A4
+fetch spans, from: now() - 30m
+| filter span.kind == "server"
+| summarize total = count(), recorded = countIf(span.status_code != "UNSET")
+| fieldsAdd pass_ratio = recorded / total
+
+# LOG trace_id on logs (Normal w=20) — builds on A2
+fetch logs, from: now() - 30m
+| summarize total = count(), correlated = countIf(isNotNull(trace_id))
+| fieldsAdd pass_ratio = correlated / total
+
+# MET casino.bet.tier present + bounded (Important w=30) — builds on B4
+fetch spans, from: now() - 30m
+| summarize present = countIf(isNotNull(casino.bet.tier)), total = count(), distinct_tier = countDistinct(casino.bet.tier)
+| fieldsAdd pass_ratio = present / total, bounded = (distinct_tier <= 8)
+```
+
+- **Before:** telemetry quality is a vibe; a dropped `service.name`, a swallowed
+  exception, a lost `trace_id`, or an exploding dimension rots the data silently
+  and still passes Weaver.
+- **After:** `bash labs/advanced/catalog-d1-instrumentation-score/verify.sh`
+  re-runs the four anchors and prints a per-service score + band — the casino
+  scoring service lands **Good → Excellent** after A1/A2/A4/B4; an untouched
+  service lands **Needs work**. The dashboard
+  (`${PARTICIPANT_ID}-instrumentation-score`) renders the four `pass_ratio` tiles
+  + the span-composite score-by-service table; `dtctl` lists it under Dashboards.
+- Deferred-verify: `verify.sh` prints the DQLs when no tenant is configured, so a
+  facilitator runs them live (same pattern as C2/C3). Grail logs use `trace_id`
+  (underscore); spans use `span.status_code` (`ERROR`/`OK`/`UNSET`) and
+  `span.kind`.
+- SDK/config rules (sampler, exporter, batch), `schema_url`, and metric
+  `unit`/descriptor metadata are **not runtime-observable** — excluded from the
+  score and left to Weaver's build-time lane.

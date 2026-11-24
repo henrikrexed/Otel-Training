@@ -107,6 +107,8 @@ nav:
           - "C2 — Reliability SLO via dtctl [20m][med]": advanced/catalog-c2-slo.md
           - "C3 — Metric event / Davis alert [20m][med]": advanced/catalog-c3-metric-davis-alert.md
           - "C4 — Dynatrace cost centers [20m][med]": advanced/catalog-c4-dynatrace-cost-center.md
+          - "Instrumentation Score — concept": advanced/instrumentation-score-concept.md
+          - "D1 — Instrumentation Score (capstone) [40m][hard]": advanced/catalog-d1-instrumentation-score.md
 
 plugins:
   - search

@@ -1,0 +1,105 @@
+{
+  "version": 18,
+  "name": "casino-instrumentation-score",
+  "description": "Runtime instrumentation score for the casino telemetry — four anchor rules (RES/SPA/LOG/MET) each as a pass_ratio tile, plus the weighted-score formula. The runtime guard that complements the Step-3 Weaver build-time guard. See the lab README. Deployed with dtctl.",
+  "variables": [],
+  "tiles": {
+    "header": {
+      "type": "markdown",
+      "title": "",
+      "content": "# 🎯 Vegas Casino — Instrumentation Score\n\nThe **runtime guard** on the `casino.*` contract (complements the Step-3 Weaver build-time guard). Four anchor rules, one per signal family, each a `pass_ratio` ∈ [0,1] over the last 30 min. Weighted into one score per service — see the note tile below. Deployed with `dtctl` (Catalog D1)."
+    },
+    "formula": {
+      "type": "markdown",
+      "title": "",
+      "content": "## Weighted score\n\n`score = Σ(weightᵢ × pass_ratioᵢ) / Σweightᵢ × 100`\n\n| Rule | Family | Impact | Weight |\n|---|---|---|---|\n| RES-001 `service.name` present | Resource | Critical | **40** |\n| Span status recorded (server) | Span | Important | **30** |\n| Log ↔ trace correlation | Log | Normal | **20** |\n| `casino.bet.tier` present + bounded | Metric | Important | **30** |\n\n**Bands:** ≥ 90 Excellent · 75–89 Good · 50–74 Needs work · < 50 Poor.\n\nDQL is single-source (one `fetch` per query), so each anchor is its own tile and the composite is this formula — not one query. The LOG anchor reads `fetch logs`; the other three read `fetch spans`."
+    },
+    "res_ratio": {
+      "type": "data",
+      "title": "RES-001 · service.name present (Critical w=40)",
+      "query": "fetch spans, from: now() - 30m | summarize total = count(), missing = countIf(isNull(service.name)) | fieldsAdd pass_ratio = (total - missing) / total | fields pass_ratio",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "thresholds": [
+          {
+            "field": "pass_ratio",
+            "rules": [
+              { "value": 0.9, "color": "#7dc540" },
+              { "value": 0.75, "color": "#f5d30f" },
+              { "value": 0, "color": "#dc172a" }
+            ]
+          }
+        ]
+      }
+    },
+    "spa_ratio": {
+      "type": "data",
+      "title": "SPA · span status recorded (Important w=30)",
+      "query": "fetch spans, from: now() - 30m | filter span.kind == \"server\" | summarize total = count(), recorded = countIf(span.status_code != \"UNSET\") | fieldsAdd pass_ratio = recorded / total | fields pass_ratio",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "thresholds": [
+          {
+            "field": "pass_ratio",
+            "rules": [
+              { "value": 0.9, "color": "#7dc540" },
+              { "value": 0.75, "color": "#f5d30f" },
+              { "value": 0, "color": "#dc172a" }
+            ]
+          }
+        ]
+      }
+    },
+    "log_ratio": {
+      "type": "data",
+      "title": "LOG · trace_id on logs (Normal w=20)",
+      "query": "fetch logs, from: now() - 30m | summarize total = count(), correlated = countIf(isNotNull(trace_id)) | fieldsAdd pass_ratio = correlated / total | fields pass_ratio",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "thresholds": [
+          {
+            "field": "pass_ratio",
+            "rules": [
+              { "value": 0.9, "color": "#7dc540" },
+              { "value": 0.75, "color": "#f5d30f" },
+              { "value": 0, "color": "#dc172a" }
+            ]
+          }
+        ]
+      }
+    },
+    "met_ratio": {
+      "type": "data",
+      "title": "MET · casino.bet.tier present + bounded (Important w=30)",
+      "query": "fetch spans, from: now() - 30m | summarize present = countIf(isNotNull(casino.bet.tier)), total = count(), distinct_tier = countDistinct(casino.bet.tier) | fieldsAdd pass_ratio = present / total, bounded = (distinct_tier <= 8) | fields pass_ratio, bounded",
+      "visualization": "singleValue",
+      "visualizationSettings": {
+        "thresholds": [
+          {
+            "field": "pass_ratio",
+            "rules": [
+              { "value": 0.9, "color": "#7dc540" },
+              { "value": 0.75, "color": "#f5d30f" },
+              { "value": 0, "color": "#dc172a" }
+            ]
+          }
+        ]
+      }
+    },
+    "score_by_service": {
+      "type": "data",
+      "title": "Span-sourced score by service (RES+SPA+MET, w=40/30/30)",
+      "query": "fetch spans, from: now() - 30m | summarize res = (count() - countIf(isNull(service.name))) / count(), spa = countIf(span.status_code != \"UNSET\" and span.kind == \"server\") / countIf(span.kind == \"server\"), met = countIf(isNotNull(casino.bet.tier)) / count(), by: { service.name } | fieldsAdd score = (40 * res + 30 * spa + 30 * met) / 90 * 100 | fieldsAdd band = if(score >= 90, \"Excellent\", else: if(score >= 75, \"Good\", else: if(score >= 50, \"Needs work\", else: \"Poor\"))) | fields service.name, score, band | sort score desc",
+      "visualization": "table"
+    }
+  },
+  "layouts": {
+    "header":            { "x": 0,  "y": 0,  "w": 24, "h": 2 },
+    "formula":           { "x": 0,  "y": 2,  "w": 24, "h": 6 },
+    "res_ratio":         { "x": 0,  "y": 8,  "w": 6,  "h": 4 },
+    "spa_ratio":         { "x": 6,  "y": 8,  "w": 6,  "h": 4 },
+    "log_ratio":         { "x": 12, "y": 8,  "w": 6,  "h": 4 },
+    "met_ratio":         { "x": 18, "y": 8,  "w": 6,  "h": 4 },
+    "score_by_service":  { "x": 0,  "y": 12, "w": 24, "h": 6 }
+  }
+}
