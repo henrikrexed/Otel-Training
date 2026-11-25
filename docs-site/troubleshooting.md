@@ -27,7 +27,7 @@ your case is not here.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Nothing from your cluster in the tenant | Missing cluster filter — shared tenant! | Filter by `k8s.cluster.name` = your `KIND_CLUSTER_NAME` everywhere |
+| Nothing from your cluster in the tenant | Missing cluster filter — shared tenant! | Filter by `k8s.cluster.name` = your `PARTICIPANT_ID` everywhere |
 | Still nothing after filtering | Collector export broken | `kubectl -n observability logs deploy/otel-gateway-collector --tail=30` — look for `endpoint must be a valid URL` (tenant env missing) or 401/404 (token/tenant mismatch → check `DT_TENANT`/`DT_INGEST_TOKEN`) |
 | 404 on OTLP export | Wrong endpoint shape | Apps export to `otel-gateway-collector.observability.svc.cluster.local:4317` (gRPC, no path); the gateway exports to `${DT_TENANT}/api/v2/otlp` |
 | Config file edits do nothing (M2) | Env vars are ignored in file mode unless referenced `${}`; wrong `OTEL_CONFIG_FILE` path | Verify the mount (`kubectl -n casino exec deploy/vegas-casino-scoring -- cat /etc/otel/otel-config.yaml`) and the env var; check the agent picked up injection (annotation present on the *pod*, not the Deployment) |
@@ -35,6 +35,20 @@ your case is not here.
 | Telemetry vanished after routing/transform step | Transform/filter on an attribute that does not exist yet | Enrichment must run before filtering — check processor order in the pipeline |
 | Errors missing under tail sampling (M4) | `decision_wait` shorter than trace duration | Raise `decision_wait` to ~15s |
 | Collector OOM / memory warnings (M4) | `num_traces` too high for the node | Lower `num_traces` or `decision_wait`; keep `memory_limiter` first |
+
+## Workshop LLM proxy (opencode)
+
+Only relevant on the advanced track Step 1, which drives the `opencode` CLI
+against a facilitator-hosted LLM proxy. The credential is minted at start-up by
+`dispense-llm.sh` into a gitignored `.workshop-llm.env`.
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `dispense-llm: WARN … 401` at start-up | Wrong `WORKSHOP_ROOM_PASSWORD` | Get the current room password from the facilitator, set it as a Codespace secret, and re-run `bash .devcontainer/bootstrap/dispense-llm.sh` |
+| `dispense-llm: WARN … could not reach the dispenser` (HTTP 000) | Dispenser host down / not yet up / network blocked | Normal before the facilitator starts the dispenser — re-run `bash .devcontainer/bootstrap/dispense-llm.sh` once it is up; check `echo $WORKSHOP_DISPENSER_URL` |
+| `opencode run` fails with a quota / budget / 429 error | Your per-attendee budget on the proxy is exhausted (enforced server-side) | Ask the facilitator to top up or reset your key; the budget is **not** something you set locally |
+| `opencode run` says no provider / model configured | `~/.config/opencode/opencode.json` not written (dispense skipped) or env not sourced | Re-run `bash .devcontainer/bootstrap/dispense-llm.sh`, then `source .workshop-llm.env` (new terminals source it automatically via `~/.bashrc`) |
+| `opencode: command not found` | Image predates opencode, or install was skipped | `FORCE=1 bash .devcontainer/bootstrap/install-tools.sh` to re-install |
 
 ## The one debug loop that solves most of it
 

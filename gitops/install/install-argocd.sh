@@ -28,16 +28,10 @@ $KUBECTL -n "$ARGOCD_NAMESPACE" rollout status statefulset/argocd-application-co
 # Expose the Argo CD UI to the attendee on NodePort 30002 (published by the kind
 # control-plane node). Keeps the UI reachable from the codespace without an
 # extra `kubectl port-forward` running in the background.
-#
-# Argo CD owns 30002 ONLY. We deliberately drop argocd-server's https (443)
-# listener here: with `server.insecure=true` (set below) the UI is served over
-# plain HTTP, and mapping https to a NodePort previously collided with 30000 —
-# the casino app's NodePort (CASINO_HTTP_NODEPORT in deploy/gateway/versions.env).
-# A single http port on 30002 keeps the band conflict-free (ISI-7533).
-log "exposing Argo CD UI on NodePort 30002 (http only; 30000 belongs to the casino app)"
+log "exposing Argo CD UI on NodePort 30002"
 $KUBECTL -n "$ARGOCD_NAMESPACE" patch svc argocd-server \
   --type merge \
-  -p '{"spec":{"type":"NodePort","ports":[{"name":"http","port":80,"targetPort":8080,"nodePort":30002}]}}'
+  -p '{"spec":{"type":"NodePort","ports":[{"name":"http","port":80,"targetPort":8080,"nodePort":30002},{"name":"https","port":443,"targetPort":8080,"nodePort":30000}]}}'
 
 # Run the API server with --insecure so plain HTTP works through the forwarded
 # NodePort in the devcontainer (no cert juggling for a throwaway training env).
@@ -45,20 +39,7 @@ log "setting argocd-server to insecure mode (training convenience)"
 $KUBECTL -n "$ARGOCD_NAMESPACE" patch configmap argocd-cmd-params-cm \
   --type merge -p '{"data":{"server.insecure":"true"}}'
 $KUBECTL -n "$ARGOCD_NAMESPACE" rollout restart deploy/argocd-server
-# BEST-EFFORT wait (|| true). Exposing the UI is a convenience, NOT a hard
-# prerequisite for the GitOps path: the application-controller + repo-server are
-# what sync the casino, and they are already Ready above. On a loaded 8 GB
-# codespace (obs + Dynatrace + NGF + Gitea + Argo all at once) argocd-server can
-# take >120s to re-roll after the restart. If this wait were fatal (it was —
-# ISI-7551), `set -e` would abort install-argocd.sh, and because
-# bootstrap-gitops.sh calls this BEFORE creating the casino Application, the
-# casino app would never be created (casino :30000 dead) while the UI sat
-# half-restarted (:30002 unreachable) — exactly the live failure. Keep it
-# non-fatal and longer; gitops/verify.sh authoritatively asserts the end state
-# (NodePort 30002 + insecure=true + Ready) and fails the M0 banner loudly if the
-# UI really did not come up.
-$KUBECTL -n "$ARGOCD_NAMESPACE" rollout status deploy/argocd-server --timeout=300s || \
-  echo "==> WARN: argocd-server not Ready within 300s after restart; the casino app will still be created and the UI should settle shortly (verify.sh will confirm :30002)"
+$KUBECTL -n "$ARGOCD_NAMESPACE" rollout status deploy/argocd-server --timeout=120s
 
 cat <<EOF
 

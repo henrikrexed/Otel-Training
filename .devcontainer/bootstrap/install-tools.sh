@@ -24,21 +24,13 @@ BIN_DIR="${BIN_DIR:-/usr/local/bin}"
 SUDO=""
 if [[ "$(id -u)" -ne 0 ]]; then SUDO="sudo"; fi
 
-# Resolve the target CPU arch / OS in Go-style names (amd64/arm64, linux/darwin).
-#
-# Precedence: honour BuildKit's TARGETARCH/TARGETOS when they are set (the
-# Dockerfile passes them through, so a `docker buildx build --platform …` cross
-# build installs the RIGHT arch even though `uname -m` would report the emulated
-# build host). Fall back to `uname` for the runtime self-heal path (postStart),
-# where no build args exist. This keeps a single detector correct in both modes.
-raw_arch="${TARGETARCH:-$(uname -m)}"
-case "$raw_arch" in
+# Normalise CPU arch to the Go-style names release assets use.
+case "$(uname -m)" in
   x86_64|amd64) ARCH="amd64" ;;
   aarch64|arm64) ARCH="arm64" ;;
-  *) echo "unsupported arch: $raw_arch" >&2; exit 1 ;;
+  *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
 esac
-OS="${TARGETOS:-$(uname -s | tr '[:upper:]' '[:lower:]')}"
-log_arch() { echo "==> toolchain target: ${OS}/${ARCH}  (TARGETARCH='${TARGETARCH:-}', uname -m='$(uname -m)')"; }
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 
 log() { echo "==> $*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -130,7 +122,6 @@ install_dtctl() {
 }
 
 main() {
-  log_arch
   install_kubectl
   install_helm
   install_kind

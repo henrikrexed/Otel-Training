@@ -127,11 +127,11 @@ Wire both sides — traces export into it, metrics read from it:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, filter/noise, tail_sampling, batch]
+          processors: [memory_limiter, k8sattributes, filter/noise, tail_sampling]
           exporters: [otlphttp/dynatrace, spanmetrics]
         metrics:
           receivers: [otlp, spanmetrics]
-          processors: [memory_limiter, k8sattributes, transform/drop_player_id, cumulativetodelta, batch]
+          processors: [memory_limiter, k8sattributes, transform/drop_player_id, cumulativetodelta]
           exporters: [otlphttp/dynatrace]
 ```
 

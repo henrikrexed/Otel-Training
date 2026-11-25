@@ -10,7 +10,7 @@ A collector pipeline is `receivers → processors → exporters`, per signal
 (traces / metrics / logs). The canonical processor order:
 
 ```
-memory_limiter → enrichment → filtering/transform → (aggregation) → batch → exporters
+memory_limiter → enrichment → filtering/transform → (aggregation) → exporter (with batching)
 ```
 
 Why this order, one sentence each:
@@ -18,7 +18,40 @@ Why this order, one sentence each:
 - `memory_limiter` **first** — shed load before spending memory on it.
 - **Enrichment before filtering** — you cannot filter on an attribute you have
   not added yet.
-- `batch` **last** — batch once, after all mutation, right before export.
+- **Batch in the exporter, not in a processor** — the `batch` processor is deprecated; batching
+  now happens once, after all mutation, inside the exporter's `sending_queue` (see the note below).
+
+!!! note "Why there is no `batch` processor"
+    The Collector's `batch` processor is **deprecated** and is planned for removal from the core
+    distributions in `v0.177.0` (May 2027); exporter-level batching becomes the default in
+    `v0.171.0` (February 2027). Batching now lives in the exporter's `sending_queue`:
+
+    ```yaml
+    exporters:
+      otlphttp/dynatrace:
+        sending_queue:
+          enabled: true
+          sizer: items
+          queue_size: 10000      # holds small, UNBATCHED requests — size it generously
+          batch:
+            enabled: true
+            sizer: items
+            min_size: 512        # was batch processor `send_batch_size`
+            max_size: 1024       # was `send_batch_max_size`
+            flush_timeout: 5s    # was `timeout`
+    ```
+
+    Migration is mechanical: delete `batch` from `processors:` and from every pipeline,
+    then enable `sending_queue.batch`. After migrating, compare
+    `otelcol_exporter_queue_size` with `otelcol_exporter_queue_capacity` — the queue
+    now holds unbatched requests, so the old `queue_size` can overflow sooner. If you
+    genuinely need batching *between* processors (e.g. before an aggregation processor),
+    the `queue_batch` processor takes the same settings. Do not run both a `batch`
+    processor and `sending_queue.batch`. Details:
+    [Migrating from the batch processor](https://opentelemetry.io/blog/2026/collector-batching-migration/).
+
+    This is a **Collector** change only. The SDK `batch` span/log processors used in
+    Module 2's `otel-config.yaml` are unaffected.
 
 And the thesis of this module: **the collector is a control point**. It sits
 between every workload and the backend, so it is the one place you can enforce
@@ -45,7 +78,8 @@ answer** for processor order:
   the gateway runs in-cluster)
 - `cumulativetodelta` — **metrics pipeline only**: counters arrive cumulative,
   Dynatrace wants rates
-- `batch` last, then `otlphttp` export to your Dynatrace tenant
+- **no `batch` processor** — batching is configured on the `otlphttp` exporter
+  (`sending_queue.batch`), which exports to your Dynatrace tenant
 
 You will edit this file in the exercises. The discipline around it is
 **config-as-product**: edit in Git → validate offline → apply → verify. Never
@@ -120,14 +154,14 @@ In your Codespace repo, edit `observability/collectors/gateway.yaml`. In the
 ```
 
 And reference it in the **metrics** pipeline, after enrichment and before
-`batch`:
+the exporter:
 
 ```yaml
     service:
       pipelines:
         metrics:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, transform/drop_player_id, cumulativetodelta, batch]
+          processors: [memory_limiter, k8sattributes, transform/drop_player_id, cumulativetodelta]
           exporters: [otlphttp/dynatrace]
 ```
 

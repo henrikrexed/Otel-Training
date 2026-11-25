@@ -88,22 +88,9 @@ spec:
             type: move
             from: attributes.container
             to: resource["k8s.container.name"]
-          # CRI runtime (containerd) writes one JSON object per line.
-          - id: parse-cri
-            type: json_parser
-            parse_from: body
-            timestamp:
-              parse_from: attributes.time
-              layout_type: gotime
-              layout: "2006-01-02T15:04:05.000000000Z07:00"
-          - id: move-log-stream
-            type: move
-            from: attributes.stream
-            to: attributes["log.iostream"]
-          - id: move-log-body
-            type: move
-            from: attributes.log
-            to: body
+          # CRI runtime (containerd) writes space-delimited text, not JSON.
+          - type: container
+            id: container-parser
 
     processors:
       memory_limiter:

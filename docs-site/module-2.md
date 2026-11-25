@@ -115,6 +115,11 @@ spec:
         value: /etc/otel/otel-config.yaml
 ```
 
+!!! note "SDK `batch` ≠ Collector `batch`"
+    The `batch` span/log processors in this file are part of the **SDK** and are not
+    deprecated. It is the *Collector's* `batch` processor that is deprecated — you will
+    see its replacement (exporter-level `sending_queue.batch`) in Module 3.
+
 Read it before you commit — every block maps to a concept from M1: resource
 identity, propagation, per-signal pipelines (tracer / meter / logger
 providers), each with its own batch processor and OTLP exporter.

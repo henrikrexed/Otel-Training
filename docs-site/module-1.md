@@ -30,10 +30,18 @@ SDK problems first (M1–M2) and collector problems second (M3–M4).
 Keep the frontend port-forward running (M0), make sure you played at least a
 few rounds of **slots** and one other game, then open Dynatrace.
 
+!!! note "Logged in with made-up details?"
+    The casino login is fake (no real auth) — if you skipped it, register with
+    invented values and pick any **Profile Type**. It matters here because the
+    telemetry you are about to read is tagged with what you typed, and this
+    casino ships a planted privacy defect that leaks your raw email/IP to the
+    shared tenant. See [M0 §5](setup.md#5-play-the-casino) for the full
+    explanation; you fix the leak in [M3](module-3.md).
+
 ### Hunt — the trace that was never whole
 
-1. Open **Distributed traces**, filter to your `k8s.cluster.name`, last 30
-   minutes.
+1. Press **Ctrl/Cmd+K**, search "Distributed Tracing", open the **Distributed
+   Tracing** app, and filter to your `k8s.cluster.name`, last 30 minutes.
 2. Search for traces containing the service `vegas-slots-service`.
 
 **What you should see:** every trace that reaches slots is *short*. Look at
@@ -96,8 +104,8 @@ kubectl -n casino rollout status deploy/vegas-casino-slots
 ## Dynatrace check
 
 1. Play a few slots rounds (or wait ~1 minute for the k6 load generator).
-2. **Distributed traces** → filter `k8s.cluster.name` = yours, service
-   `vegas-slots-service`, last 5 minutes.
+2. **Distributed Tracing** app (Ctrl/Cmd+K → "Distributed Tracing") → filter
+   `k8s.cluster.name` = yours, service `vegas-slots-service`, last 5 minutes.
 
 **What you should see:** traces now **start at `vegas-frontend-service`** and
 flow frontend → slots in one connected flame graph. The orphan-rooted slots
