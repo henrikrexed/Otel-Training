@@ -75,7 +75,10 @@ spec:
             - k8s.node.name
             - k8s.container.name
             - container.image.name
-            - container.image.tag
+            # Plural is the stable semconv key: with the default
+            # DontEmitV0K8sConventions gate (collector 0.164.0) the legacy
+            # singular container.image.tag is deprecated and dropped.
+            - container.image.tags
           labels:
             - tag_name: k8s.app.label.name
               key: app.kubernetes.io/name

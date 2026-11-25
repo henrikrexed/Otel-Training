@@ -88,22 +88,17 @@ spec:
             type: move
             from: attributes.container
             to: resource["k8s.container.name"]
-          # CRI runtime (containerd) writes one JSON object per line.
+          # CRI runtime (containerd) writes space-delimited text:
+          # '<RFC3339Nano> <stdout|stderr> <F|P> <message>' (not JSON), so a
+          # json_parser can never parse it. The container operator handles
+          # the CRI line natively: body becomes the message, log.iostream is
+          # set from the stream field, logtag keeps the F/P flag (partial
+          # lines are recombined), and the entry timestamp is parsed from
+          # the line. K8s identity still comes from parse-k8s-path above,
+          # so the operator's own file-path metadata extraction is off.
           - id: parse-cri
-            type: json_parser
-            parse_from: body
-            timestamp:
-              parse_from: attributes.time
-              layout_type: gotime
-              layout: "2006-01-02T15:04:05.000000000Z07:00"
-          - id: move-log-stream
-            type: move
-            from: attributes.stream
-            to: attributes["log.iostream"]
-          - id: move-log-body
-            type: move
-            from: attributes.log
-            to: body
+            type: container
+            add_metadata_from_filepath: false
 
     processors:
       memory_limiter:
