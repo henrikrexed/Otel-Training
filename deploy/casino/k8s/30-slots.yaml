@@ -100,7 +100,7 @@ spec:
             # Trace Context -> every slots request becomes an orphan trace.
             # Fixed in Module 1 of the training docs-site.
             - name: OTEL_PROPAGATORS
-              value: "vegas-legacy"
+              value: "tracecontext,baggage"
             - name: REDIS_HOST
               value: "vegas-casino-redis"
             - name: REDIS_PORT
