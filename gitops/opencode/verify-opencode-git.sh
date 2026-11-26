@@ -28,7 +28,13 @@ pass() { echo "[PASS] $*"; PASS=$((PASS+1)); }
 fail() { echo "[FAIL] $*"; FAIL=$((FAIL+1)); }
 info() { echo "       $*"; }
 
-json_str() { python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$1"; }
+# JSON-encode a string without python3/jq (the casino clone container has neither).
+json_str() {
+  local s=$1
+  s=${s//\\/\\\\}; s=${s//\"/\\\"}
+  s=${s//$'\t'/\\t}; s=${s//$'\r'/\\r}; s=${s//$'\n'/\\n}
+  printf '"%s"' "$s"
+}
 
 echo "=== opencode⇄Gitea git-loop verification (ISI-7711) ==="
 if [[ -z "${GITEA_TOKEN:-}" ]]; then

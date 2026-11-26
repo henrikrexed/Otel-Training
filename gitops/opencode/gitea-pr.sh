@@ -44,6 +44,18 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
+# Guard: 'origin' must point at Gitea, not the GitHub training repo. Running this
+# from /workspaces/.../apps/casino pushes to GitHub upstream and then opens a PR
+# against Gitea that has no such branch — surface the mistake instead.
+GITEA_HOST="${GITEA_URL#http://}"; GITEA_HOST="${GITEA_HOST#https://}"; GITEA_HOST="${GITEA_HOST%%/*}"
+ORIGIN_URL="$(git remote get-url origin 2>/dev/null || echo '')"
+if [[ -n "$ORIGIN_URL" && "$ORIGIN_URL" != *"$GITEA_HOST"* ]]; then
+  warn "origin ($ORIGIN_URL) is not the Gitea repo ($GITEA_URL)."
+  warn "You are likely in the training repo, not the casino clone. cd into \$HOME/casino"
+  warn "(run gitops/opencode/clone-casino.sh if it is missing), then re-run from there."
+  exit 1
+fi
+
 # Derive a branch name from the title if one was not given.
 if [[ -z "$BRANCH" ]]; then
   slug="$(printf '%s' "$TITLE" | tr '[:upper:]' '[:lower:]' \
@@ -74,7 +86,14 @@ log "pushing '$BRANCH' to origin"
 git push -q -u origin "$BRANCH"
 
 # 4) Open the PR via Gitea's REST API.
-json_str() { python3 -c 'import json,sys;print(json.dumps(sys.argv[1]))' "$1"; }
+# JSON-encode a string without python3/jq (the casino clone container has neither).
+# Covers the chars that occur in titles, branch names and bodies.
+json_str() {
+  local s=$1
+  s=${s//\\/\\\\}; s=${s//\"/\\\"}
+  s=${s//$'\t'/\\t}; s=${s//$'\r'/\\r}; s=${s//$'\n'/\\n}
+  printf '"%s"' "$s"
+}
 PR_BODY="$(json_str "Opened from the Codespace CLI via opencode. Merge in the Gitea UI to roll out.")"
 PAYLOAD="$(printf '{"title":%s,"head":%s,"base":%s,"body":%s}' \
   "$(json_str "$TITLE")" "$(json_str "$BRANCH")" "$(json_str "$BASE_BRANCH")" "$PR_BODY")"
