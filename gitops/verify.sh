@@ -482,6 +482,52 @@ else
   info "loop-closed live test skipped (set VERIFY_IMAGE_LOOP=1 to push a probe commit and assert the deployed tag changes)"
 fi
 
+# --- 7. containerd config_path active + casino image pulls healthy (ISI-7930) ---
+# GH #168: a REUSED kind cluster created before the config_path patch landed
+# never reads /etc/containerd/certs.d, so Gitea-registry pulls fail and casino
+# pods ImagePullBackOff while Argo reports Synced+Degraded. create-cluster.sh
+# now self-heals this (patch config.toml + restart containerd); assert the end
+# state here and, when a pod IS stuck, surface the REAL pull reason (describe
+# events) instead of a bare "see reason above" with nothing above it.
+hdr "7. containerd config_path + casino image pulls (ISI-7930, GH #168)"
+VERIFY_CLUSTER="${KIND_CLUSTER_NAME:-${PARTICIPANT_ID:-otel-training}}"
+if command -v kind >/dev/null 2>&1 && command -v docker >/dev/null 2>&1; then
+  mirror_nodes=$(kind get nodes --name "$VERIFY_CLUSTER" 2>/dev/null)
+  if [[ -z "$mirror_nodes" ]]; then
+    info "no kind nodes for cluster '$VERIFY_CLUSTER' — skipping containerd config_path check"
+  else
+    for n in $mirror_nodes; do
+      cnt=$(docker exec "$n" grep -cE 'config_path[[:space:]]*=[[:space:]]*"/etc/containerd/certs\.d"' /etc/containerd/config.toml 2>/dev/null)
+      if [[ "${cnt:-0}" -ge 1 ]]; then
+        pass "node '$n': containerd config_path = /etc/containerd/certs.d (certs.d mirror active)"
+      else
+        fail "node '$n': containerd config_path for /etc/containerd/certs.d MISSING — Gitea pulls will 'no such host'. Recreate: kind delete cluster --name '$VERIFY_CLUSTER' (create-cluster.sh self-heals on next bring-up)"
+      fi
+    done
+  fi
+else
+  info "kind/docker not available here — skipping node containerd config_path check"
+fi
+
+# Surface the REAL ImagePull reason for any non-Ready casino pod (ISI-7930 #3).
+stuck=$(kubectl -n "$CASINO_NS" get pods \
+  -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.containerStatuses[*]}{.state.waiting.reason}{" "}{end}{"\n"}{end}' 2>/dev/null \
+  | grep -iE 'ImagePullBackOff|ErrImagePull|ImageInspectError' | awk '{print $1}')
+if [[ -n "$stuck" ]]; then
+  fail "casino pod(s) stuck on image pull — real reason(s) below (not 'see reason above'):"
+  for p in $stuck; do
+    img=$(kubectl -n "$CASINO_NS" get pod "$p" -o jsonpath='{.spec.containers[0].image}' 2>/dev/null)
+    info "  $p ($img):"
+    kubectl -n "$CASINO_NS" get pod "$p" \
+      -o jsonpath='{range .status.containerStatuses[*]}{.state.waiting.reason}{": "}{.state.waiting.message}{"\n"}{end}' 2>/dev/null \
+      | sed 's/^/        /' | tee -a "$EVIDENCE" >/dev/null
+    kubectl -n "$CASINO_NS" describe pod "$p" 2>/dev/null \
+      | grep -iE 'Failed|no such host|pull|Back-off' | tail -3 | sed 's/^/        /' | tee -a "$EVIDENCE" >/dev/null
+  done
+else
+  info "no casino pods in ImagePullBackOff/ErrImagePull"
+fi
+
 # --- Summary ----------------------------------------------------------------
 hdr "Summary"
 info "PASS=$PASS  FAIL=$FAIL"
