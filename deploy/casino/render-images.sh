@@ -20,8 +20,17 @@
 # contract (NO kustomize), so the default (GHCR, D1) render is byte-identical to
 # before and the Gitea flip is purely additive. Pull is public/anonymous — no
 # imagePullSecret is added either way (D3). Infra images (postgres, redis, curl)
-# and the upstream grafana/k6 loadgen (D4) are not casino-built and are left
-# untouched in both modes.
+# are not casino-built and are left untouched in both modes.
+#
+# grafana/k6 loadgen (ISI-7937): the k6 loadgen image is the ONE image that was
+# never built by CI AND never remapped — it stayed on docker.io in both modes.
+# On a kind cluster that cannot reach Docker Hub (mirror-only containerd / rate
+# limit / air-gapped) the k6 pod ImagePullBackOff'd while every vegasapp service
+# was Healthy, because those were already served from the in-cluster Gitea
+# registry. Under IMAGE_SOURCE=gitea we now ALSO remap grafana/k6:<tag> to the
+# Gitea alias (<GITEA_REGISTRY>/<GITEA_OWNER>/grafana-k6:<tag>), which the
+# bootstrap mirror (mirror-baseline-images.sh) pre-populates from docker.io by
+# digest. Under the default IMAGE_SOURCE=ghcr the loadgen stays on docker.io.
 #
 # Usage:
 #   render-images.sh                 # render k8s/ -> stdout (concatenated), GHCR
@@ -40,6 +49,8 @@
 #                 gitea rewrites casino images to the ISI-7638 registry alias.
 #   GITEA_REGISTRY  Gitea registry alias     (default: gitea.local:30001) — WS-D contract.
 #   GITEA_OWNER     Gitea packages owner/org (default: casino) — CASINO_ORG in seed-gitea.sh.
+#   GITEA_K6_REPO   Gitea repo for the mirrored k6 image (default: grafana-k6) — must
+#                   match the destination in mirror-baseline-images.sh (ISI-7937).
 #   SRC_DIR       source manifests directory (default: <this dir>/k8s)
 set -euo pipefail
 
@@ -68,6 +79,9 @@ SRC_DIR="${SRC_DIR:-$SCRIPT_DIR/k8s}"
 IMAGE_SOURCE="${IMAGE_SOURCE:-ghcr}"
 GITEA_REGISTRY="${GITEA_REGISTRY:-gitea.local:30001}"
 GITEA_OWNER="${GITEA_OWNER:-casino}"
+# Gitea repo that holds the mirrored upstream k6 loadgen image (ISI-7937). Must
+# match the destination mirror-baseline-images.sh pushes grafana/k6 to.
+GITEA_K6_REPO="${GITEA_K6_REPO:-grafana-k6}"
 case "$IMAGE_SOURCE" in
   ghcr|gitea) ;;
   *) echo "render-images.sh: IMAGE_SOURCE must be 'ghcr' or 'gitea', got '$IMAGE_SOURCE'" >&2; exit 2 ;;
@@ -92,17 +106,22 @@ fi
 IMAGE_OWNER="$(printf '%s' "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
 
 # Only these placeholders are substituted — nothing else in the YAML is touched.
-# When IMAGE_SOURCE=gitea, a second, additive sed rewrites ONLY the casino-built
+# When IMAGE_SOURCE=gitea, a second, additive sed rewrites the casino-built
 # vegasapp images (ghcr.io/<owner>/otel-training/vegasapp-*) to the Gitea alias
 # (<GITEA_REGISTRY>/<GITEA_OWNER>/vegasapp-*). The owner segment is already a
-# concrete value by then, so [^/]* matches it; the tag is preserved. postgres,
-# redis, curl and grafana/k6 don't match the pattern and stay on their upstreams.
+# concrete value by then, so [^/]* matches it; the tag is preserved. The same
+# pass ALSO remaps the one remaining unmirrored image — the upstream loadgen
+# `grafana/k6:<tag>` -> <GITEA_REGISTRY>/<GITEA_OWNER>/<GITEA_K6_REPO>:<tag>
+# (ISI-7937), so a Docker-Hub-unreachable cluster no longer ImagePullBackOffs the
+# loadgen. postgres, redis and curl are left on their upstreams (pulled directly
+# in both modes). Under IMAGE_SOURCE=ghcr every image stays on its public origin.
 render() {
   sed -e "s|\${IMAGE_OWNER}|${IMAGE_OWNER}|g" \
       -e "s|\${IMAGE_TAG}|${IMAGE_TAG}|g" \
       -e "s|\${CLUSTER_NAME}|${CLUSTER_NAME}|g" "$1" \
   | if [[ "$IMAGE_SOURCE" == "gitea" ]]; then
-      sed -e "s|ghcr\.io/[^/]*/otel-training/vegasapp-|${GITEA_REGISTRY}/${GITEA_OWNER}/vegasapp-|g"
+      sed -e "s|ghcr\.io/[^/]*/otel-training/vegasapp-|${GITEA_REGISTRY}/${GITEA_OWNER}/vegasapp-|g" \
+          -e "s|\(image: *\)grafana/k6:|\1${GITEA_REGISTRY}/${GITEA_OWNER}/${GITEA_K6_REPO}:|g"
     else
       cat
     fi
