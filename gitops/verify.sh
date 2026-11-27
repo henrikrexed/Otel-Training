@@ -497,7 +497,7 @@ if command -v kind >/dev/null 2>&1 && command -v docker >/dev/null 2>&1; then
     info "no kind nodes for cluster '$VERIFY_CLUSTER' — skipping containerd config_path check"
   else
     for n in $mirror_nodes; do
-      cnt=$(docker exec "$n" grep -cE 'config_path[[:space:]]*=[[:space:]]*"/etc/containerd/certs\.d"' /etc/containerd/config.toml 2>/dev/null)
+      cnt=$(docker exec "$n" grep -cE '^[[:space:]]*config_path[[:space:]]*=[[:space:]]*"/etc/containerd/certs\.d"' /etc/containerd/config.toml 2>/dev/null)
       if [[ "${cnt:-0}" -ge 1 ]]; then
         pass "node '$n': containerd config_path = /etc/containerd/certs.d (certs.d mirror active)"
       else

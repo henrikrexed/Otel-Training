@@ -115,7 +115,7 @@ heal_containerd_config_path() {
   # Idempotent fast path: already pointing at certs.d -> nothing to do. This is
   # the normal case for a freshly created cluster (patch applied at create) and
   # for every postStart rerun, so no healthy cluster ever gets a needless restart.
-  if docker exec "$node" grep -qE 'config_path[[:space:]]*=[[:space:]]*"/etc/containerd/certs\.d"' "$cfg" 2>/dev/null; then
+  if docker exec "$node" grep -qE '^[[:space:]]*config_path[[:space:]]*=[[:space:]]*"/etc/containerd/certs\.d"' "$cfg" 2>/dev/null; then
     return 0
   fi
   log "  $node: containerd config_path -> /etc/containerd/certs.d MISSING (reused pre-ISI-7638 cluster); self-healing" >&2
