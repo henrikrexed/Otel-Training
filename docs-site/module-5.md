@@ -230,7 +230,7 @@ review its diff, then ship it:
 | Fix surface | How it shipped |
 |---|---|
 | **Casino config / manifests** — Branch A (`k8s/**` — env + YAML; M1, M2 config, M9 head sampling) | opencode → PR/MR on your git host → **merge** → Argo CD syncs `main`. [Full flow](setup.md#ship-it) |
-| **Casino app code** — Branch B (`apps/casino/**` — M2 span, M6/M7 source fixes) | opencode → PR/MR → **image CI green → merge → image build + `:<sha>` write-back** → Argo CD syncs. [Full flow](setup.md#ship-it) |
+| **Casino app code** — Branch B (`apps/casino/**` — M2 span, M6/M7 source fixes) | opencode → PR/MR → **merge → image CI builds + `:<sha>` write-back (wait for green)** → Argo CD syncs. [Full flow](setup.md#ship-it) |
 | **Collector** (`observability/collectors/gateway.yaml` — M6/M7 backstops, M8 cost, M9 tail sampling) | opencode → `validate.sh` → `kubectl apply` (the `observability` namespace is not Argo-managed) |
 
 Steering the agent back when its diff was wrong — *"memory_limiter stays first, no

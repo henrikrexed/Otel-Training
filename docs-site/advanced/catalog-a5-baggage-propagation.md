@@ -169,10 +169,12 @@ code**, so merging kicks off the image CI — do not expect Argo CD to sync unti
 the new images exist:
 
 !!! tip "Ship it — Branch B (`apps/casino/**` code)"
-    Open the PR, **wait for the image CI (Gitea Actions `casino-images`) to go
-    green**, merge, then **wait for the image build + `:<sha>` write-back commit**
-    before Argo CD syncs and **both** services' pods roll to the new image. Full
-    flow: [the GitOps loop](../setup.md#ship-it).
+    Open the PR and **merge it** — in Gitea the image CI does **not** run on the
+    PR. Merging `apps/casino/**` to `main` triggers the image CI (Gitea Actions
+    `casino-images`); **watch that run go green** — it builds the images, tags
+    `:<sha>`, and writes `:<sha>` back into `k8s/`. Only then does Argo CD sync and
+    **both** services' pods roll to the new image. Full flow:
+    [the GitOps loop](../setup.md#ship-it).
 
 Once the new images are rolled out, play a few spins as different tiers (set the
 `x-player-tier` header to `gold` / `silver` / `bronze`) so tiered spans flow
