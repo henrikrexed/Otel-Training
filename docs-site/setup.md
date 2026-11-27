@@ -601,13 +601,19 @@ All UIs are forwarded to your codespace and appear, labelled, in the
 | Git host — Gitea (offline fallback) | http://localhost:30001 | `attendee` / `trainingpass123` |
 | Argo CD | http://localhost:30002 | `admin` / password: see below |
 
-**Lost the Argo CD password?** The bootstrap output is long, so it is easy to
-miss. Read it back any time:
+**Lost a URL or password?** Bring-up prints this table at the end, but the
+output is long. Read every login back — URLs **and** passwords for Argo CD,
+Gitea, the casino and Dynatrace — any time, straight from your cluster:
 
 ```bash
-kubectl -n argocd get secret argocd-initial-admin-secret \
-  -o jsonpath='{.data.password}' | base64 -d; echo
+bash .devcontainer/bootstrap/print-env-details.sh
 ```
+
+It is read-only and safe to re-run; it reads the Argo CD password live from the
+`argocd-initial-admin-secret` so it stays correct after a rebuild. (If you want
+just the raw Argo CD password, `kubectl -n argocd get secret
+argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo`
+still works.)
 
 1. Open your git host and sign in, then find the repo `casino/casino` — it
    contains the Kubernetes manifests under `k8s/` for the `casino` namespace.

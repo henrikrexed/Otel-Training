@@ -522,6 +522,18 @@ if [[ -z "$DT_READY" ]]; then
 fi
 echo "${BOLD}================================================================${RST}"
 
+# --- Where do I log in? ------------------------------------------------------
+# Print the live URLs + credentials for Argo CD / Gitea / casino / Dynatrace so
+# the attendee never has to grep scripts for a password (ISI-7932 / #170). This
+# is read-only and re-runnable on demand; it writes nothing to the evidence
+# bundle (passwords must not leak into an attached bundle).
+if [[ -f "$SCRIPT_DIR/print-env-details.sh" ]]; then
+  bash "$SCRIPT_DIR/print-env-details.sh" || true
+  echo
+  echo " ${DIM}Tip: re-run this login summary any time with${RST}"
+  echo " ${DIM}  bash .devcontainer/bootstrap/print-env-details.sh${RST}"
+fi
+
 if [[ "$fails" -gt 0 ]]; then
   warn "$fails phase(s) reported FAIL — see the banner + evidence bundle above"
   exit 1
