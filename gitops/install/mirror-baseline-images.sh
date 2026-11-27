@@ -24,10 +24,23 @@
 #   (create-cluster.sh) rewrites the alias to http://localhost:30001.
 #
 # Contract (project precedent): idempotent (crane copy re-push is a no-op when the
-# digest already exists) and NON-FATAL + LOUD — a mirror hiccup must never abort
-# the GitOps bootstrap (ISI-7555). Exit is always 0; the per-image result and a
-# final summary are printed so a failure is obvious. gitops/verify.sh + the
-# casino-health gate in bootstrap are the authorities on the true end state.
+# digest already exists) and LOUD — the per-image result and a final summary are
+# printed so a failure is obvious. gitops/verify.sh + the casino-health gate in
+# bootstrap are the authorities on the true end state.
+#
+# Resilience + fail-loud (ISI-7931 / GH #169): a SINGLE transient GHCR hiccup used
+# to leave one of the 7 refs missing while the script still exit 0, so bootstrap
+# installed Argo CD onto a registry that could not serve :<tag> and the casino
+# pods ImagePullBackOff'd with a confusing "not found". Two guards fix that:
+#   1. RETRY — each `crane` manifest/copy is retried a few times with short
+#      back-off, so a transient token/redirect error self-heals in-place.
+#   2. STRICT VERIFY — after the copy loop we re-query the Gitea registry for every
+#      expected ref and, when MIRROR_STRICT=true (the default, set by bootstrap),
+#      exit NON-ZERO if any is still missing. bootstrap-gitops.sh fails the whole
+#      bring-up LOUDLY *before* installing Argo CD ("image X missing in registry"),
+#      which is a far clearer signal than a downstream ImagePullBackOff.
+# Set MIRROR_STRICT=false to restore the old always-exit-0 behaviour (e.g. a manual
+# re-run where you only want best-effort top-up).
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,8 +92,43 @@ CASINO_PROFILE="${CASINO_PROFILE:-full}"
 MIRROR_TAG_FALLBACK="${MIRROR_TAG_FALLBACK:-true}"
 BASELINE_FALLBACK_TAG="${BASELINE_FALLBACK_TAG:-latest}"
 
+# Resilience knobs (ISI-7931 / GH #169).
+# MIRROR_RETRIES    — attempts per crane op before giving up (so a transient GHCR
+#                     token/redirect error self-heals without failing the mirror).
+# MIRROR_RETRY_WAIT — base back-off seconds; the wait grows linearly per attempt.
+# MIRROR_STRICT     — when true, exit NON-ZERO if any expected ref is missing from
+#                     the Gitea registry after mirroring, so bootstrap can fail the
+#                     bring-up loudly BEFORE installing Argo CD. Default true.
+MIRROR_RETRIES="${MIRROR_RETRIES:-3}"
+MIRROR_RETRY_WAIT="${MIRROR_RETRY_WAIT:-3}"
+MIRROR_STRICT="${MIRROR_STRICT:-true}"
+
 log()  { echo "==> $*"; }
 warn() { echo "==> WARN: $*" >&2; }
+
+# retry <label> <cmd...> — run a command up to MIRROR_RETRIES times with a short,
+# linearly-growing back-off. Returns the command's exit status on success, or the
+# last failure's status after exhausting the retries. The per-attempt note is only
+# printed when a retry is actually needed, so the happy path stays quiet.
+retry() {
+  local label="$1"; shift
+  local attempt=1 rc=0 wait
+  while :; do
+    # NB: capture the command's status directly — `if "$@"; then ...; fi` followed
+    # by `rc=$?` would read the if-statement's status (0 when no else ran), not the
+    # command's, which would make retry always report success.
+    "$@" && return 0
+    rc=$?
+    if (( attempt >= MIRROR_RETRIES )); then
+      warn "    ${label}: failed after ${attempt} attempt(s) (rc=${rc})"
+      return "$rc"
+    fi
+    wait=$(( MIRROR_RETRY_WAIT * attempt ))
+    warn "    ${label}: attempt ${attempt}/${MIRROR_RETRIES} failed (rc=${rc}) — retrying in ${wait}s"
+    sleep "$wait"
+    attempt=$(( attempt + 1 ))
+  done
+}
 
 # The 7 casino-BUILT services (the ones render-images.sh rewrites to Gitea).
 # postgres/redis/curl and grafana/k6 are upstream infra images, pulled straight
@@ -107,20 +155,32 @@ if ! command -v "$CRANE" >/dev/null 2>&1; then
   warn "Install it (FORCE=1 bash .devcontainer/bootstrap/install-tools.sh) and re-run:"
   warn "  bash $SCRIPT_DIR/mirror-baseline-images.sh"
   warn "Until then, casino pods referencing gitea.local:${GITEA_NODEPORT} will ImagePullBackOff."
-  exit 0   # non-fatal: bootstrap continues; this is loud enough to act on
+  # Without crane the Gitea registry WILL be empty, so under strict mode this is a
+  # hard failure the caller must surface before Argo installs (ISI-7931). A manual
+  # best-effort run (MIRROR_STRICT=false) keeps the old non-fatal exit.
+  [[ "$MIRROR_STRICT" == "true" ]] && exit 1
+  exit 0
 fi
 
-# Wait (best-effort, short) for the Gitea registry /v2/ endpoint on the host
-# loopback. Loud on timeout; still attempt the copies (crane will report per-image).
-log "waiting for the Gitea registry at http://${PUSH_HOST}/v2/ (up to 60s)"
-REG_UP=0
-for i in $(seq 1 30); do
-  if curl -fsS "http://${PUSH_HOST}/v2/" >/dev/null 2>&1 || curl -fsS -o /dev/null -w '%{http_code}' "http://${PUSH_HOST}/v2/" 2>/dev/null | grep -qE '^(200|401)$'; then
-    REG_UP=1; break
+# Wait for the Gitea registry /v2/ endpoint on the host loopback before copying.
+# The old probe used `curl -f` (which treats the registry's 401 challenge as a
+# failure) and a 60s budget that was too short on a loaded 8 GB codespace, so the
+# "did not answer" warning fired even when the copies then succeeded (ISI-7931).
+# Fix: DROP -f and treat ANY real HTTP status (200/401/404 — the Docker v2 API
+# answers 401 unauthenticated) as "registry is up"; only a connection failure
+# (curl writes code 000) keeps waiting. Budget raised to REG_WAIT_SECS (180s).
+REG_WAIT_SECS="${REG_WAIT_SECS:-180}"
+REG_WAIT_INTERVAL="${REG_WAIT_INTERVAL:-3}"
+log "waiting for the Gitea registry at http://${PUSH_HOST}/v2/ (up to ${REG_WAIT_SECS}s)"
+REG_UP=0 reg_code=000
+for (( waited = 0; waited < REG_WAIT_SECS; waited += REG_WAIT_INTERVAL )); do
+  reg_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://${PUSH_HOST}/v2/" 2>/dev/null || echo 000)"
+  if [[ "$reg_code" =~ ^(200|401|404)$ ]]; then
+    REG_UP=1; log "Gitea registry answered on ${PUSH_HOST} (HTTP ${reg_code}) after ${waited}s"; break
   fi
-  sleep 2
+  sleep "$REG_WAIT_INTERVAL"
 done
-[[ "$REG_UP" -eq 1 ]] || warn "Gitea registry did not answer on ${PUSH_HOST} within 60s — attempting copies anyway (crane will report)."
+[[ "$REG_UP" -eq 1 ]] || warn "Gitea registry did not answer on ${PUSH_HOST} within ${REG_WAIT_SECS}s (last HTTP ${reg_code}) — attempting copies anyway (crane will report)."
 
 # Authenticate the push side (Gitea requires auth to push packages). Anonymous
 # PULL by the nodes works when the '$GITEA_OWNER' org is public (Gitea default),
@@ -157,10 +217,14 @@ for svc in "${SERVICES[@]}"; do
 
   src="${src_repo}:${src_tag}"
   log "  vegasapp-${svc}: $src -> $dst"
-  if "$CRANE" copy "$src" "$dst" --insecure 2>&1 | sed 's/^/      crane: /'; then
+  # Retry the copy (ISI-7931): the observed cold-start failure was a transient GHCR
+  # token/redirect error mid-copy ("stopped after 10 redirects") that left one of
+  # the 7 refs missing. A couple of retries with back-off makes that self-heal.
+  # crane's own progress goes to stderr; tee it through sed so it stays visible.
+  if retry "vegasapp-${svc} copy" bash -c '"$1" copy "$2" "$3" --insecure 2>&1 | sed "s/^/      crane: /"; exit ${PIPESTATUS[0]}' _ "$CRANE" "$src" "$dst"; then
     # Tag :latest too (best-effort) so a `:latest` render also resolves. A second
     # copy from the just-pushed Gitea ref avoids re-pulling GHCR.
-    "$CRANE" copy "$dst" "$dst_latest" --insecure >/dev/null 2>&1 \
+    retry "vegasapp-${svc} :latest" "$CRANE" copy "$dst" "$dst_latest" --insecure >/dev/null 2>&1 \
       || warn "    could not also tag vegasapp-${svc}:latest (continuing)"
     copied=$((copied + 1))
   else
@@ -175,10 +239,35 @@ if [[ "$fellback" -gt 0 ]]; then
   warn "${fellback} image(s) were mirrored from '${BASELINE_FALLBACK_TAG}' because the pinned tag '${IMAGE_TAG}' is not published on GHCR."
   warn "This keeps cold-start green, but the pinned '${IMAGE_TAG}' content is the newest PUBLIC build, not a build of the '${IMAGE_TAG}' source. The authoritative '${IMAGE_TAG}' image is produced by the in-cluster CI write-back loop (ISI-7826 / child 2)."
 fi
-if [[ "$failed" -gt 0 ]]; then
-  warn "${failed} image(s) did not mirror — casino pods for those services will ImagePullBackOff until fixed."
-  warn "Re-run (idempotent): bash $SCRIPT_DIR/mirror-baseline-images.sh"
-  warn "Check: are the GHCR baseline images public at tag '${IMAGE_TAG}'? is the Gitea registry up on NodePort ${GITEA_NODEPORT}?"
+
+# Strict verification (ISI-7931 / GH #169): the copy-loop counters say what THIS
+# run attempted; the authoritative question for Argo is "does the registry now
+# serve every expected ref at ${IMAGE_TAG}?". Re-query the Gitea registry for each
+# expected ref so a ref that silently failed to persist is caught HERE, before
+# bootstrap installs Argo CD onto a registry that would ImagePullBackOff.
+log "verifying all ${#SERVICES[@]} expected ref(s) resolve in the Gitea registry (${PUSH_HOST}/${GITEA_OWNER}/vegasapp-*:${IMAGE_TAG})"
+missing=0 missing_list=""
+for svc in "${SERVICES[@]}"; do
+  ref="${PUSH_HOST}/${GITEA_OWNER}/vegasapp-${svc}:${IMAGE_TAG}"
+  if retry "verify vegasapp-${svc}" "$CRANE" manifest "$ref" --insecure >/dev/null 2>&1; then
+    log "    ok: ${ref}"
+  else
+    warn "    MISSING in registry: ${ref}"
+    missing=$((missing + 1)); missing_list="${missing_list:+$missing_list }vegasapp-${svc}"
+  fi
+done
+
+if [[ "$missing" -gt 0 ]]; then
+  warn "${missing} expected image(s) are MISSING from the Gitea registry: ${missing_list}"
+  warn "casino pods for those services WILL ImagePullBackOff once Argo CD syncs."
+  warn "Re-run (idempotent): MIRROR_STRICT=false bash $SCRIPT_DIR/mirror-baseline-images.sh"
+  warn "Check: are the GHCR baseline images public at tag '${IMAGE_TAG}' (or fallback '${BASELINE_FALLBACK_TAG}')? is the Gitea registry up on NodePort ${GITEA_NODEPORT}?"
+  if [[ "$MIRROR_STRICT" == "true" ]]; then
+    warn "MIRROR_STRICT=true — exiting non-zero so bootstrap fails the bring-up BEFORE installing Argo CD (ISI-7931)."
+    exit 1
+  fi
+  warn "MIRROR_STRICT=false — exiting 0 (best-effort); the casino-health gate downstream is the backstop."
+else
+  log "all ${#SERVICES[@]} expected ref(s) are present in the Gitea registry — registry is ready for Argo CD to sync."
 fi
-# Always exit 0 — non-fatal by contract (ISI-7555); the summary above is the signal.
 exit 0

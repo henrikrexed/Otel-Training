@@ -84,6 +84,10 @@ EVIDENCE_DIR="${EVIDENCE_DIR:-$REPO_ROOT/.devcontainer/evidence}"
 # Stamp is injected by the caller for deterministic filenames; `date` is fine at
 # runtime inside a Codespace (this is not a workflow script).
 STAMP="${STAMP:-$(date -u +%Y%m%dT%H%M%SZ 2>/dev/null || echo manual)}"
+# Export so child bootstrap scripts (bootstrap-gitops.sh -> mirror-baseline-images.sh)
+# write their own logs into the SAME evidence bundle (ISI-7931: mirror output was
+# console-only and lost on scrollback).
+export EVIDENCE_DIR STAMP
 
 # --- Pretty output -----------------------------------------------------------
 BOLD=$'\033[1m'; BLUE=$'\033[1;34m'; GREEN=$'\033[1;32m'; YELLOW=$'\033[1;33m'
@@ -100,11 +104,27 @@ usage() { sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; }
 # Terminal container states that will NEVER self-heal on their own — waiting out
 # a rollout timeout on these just wastes the attendee's time and then reports a
 # generic "not ready". Detect them early and surface the ACTUAL reason.
+#
+# Two classes (ISI-7931 / GH #169):
+#   HARD      — never self-heal (bad image name, config/exec error, crash loop).
+#               Fail the moment one is seen.
+#   TRANSIENT — image-pull reasons that CAN clear on their own: the kubelet keeps
+#               retrying the pull, so a registry that was briefly empty / slow (the
+#               cold-start mirror still propagating) recovers without intervention.
+#               These get a grace window before being treated as terminal, so a
+#               brief ErrImagePull during bring-up no longer aborts the whole run
+#               (mirrors the loadgen health-gate grace pattern, ISI-7649).
+HARD_TERMINAL_REASONS_RE='^(InvalidImageName|CreateContainerConfigError|CreateContainerError|RunContainerError|ImageInspectError|CrashLoopBackOff)$'
+TRANSIENT_REASONS_RE='^(ImagePullBackOff|ErrImagePull)$'
+# Back-compat: the combined set is still used by the post-mortem casino scan.
 TERMINAL_REASONS_RE='^(ImagePullBackOff|ErrImagePull|InvalidImageName|CreateContainerConfigError|CreateContainerError|RunContainerError|ImageInspectError|CrashLoopBackOff)$'
 
-# scan_terminal_pods <namespace> — print "  pod/container: Reason — message" for
-# every container stuck in a terminal state; silent if there are none. Returns 0
+# scan_terminal_pods <namespace> [class] — print "  pod/container: Reason — message"
+# for every container stuck in a terminal state; silent if there are none. Returns 0
 # always (callers test the captured output), kubectl-only (no jq dependency).
+# class (ISI-7931): all (default) | hard | transient — selects which reasons to
+# report, so the grace-aware wait can fail fast on 'hard' yet give 'transient'
+# image-pull states a window to self-heal.
 #
 # Scope: only pods that back a *service* Deployment are scanned. Deployment pods
 # are ReplicaSet-owned, so we skip any pod whose top ownerReference.kind is Job —
@@ -118,13 +138,18 @@ TERMINAL_REASONS_RE='^(ImagePullBackOff|ErrImagePull|InvalidImageName|CreateCont
 # stuck pulling an init-container image is just as terminal as an app container
 # and should fast-fail rather than drain the full rollout timeout (ISI-7649 N2).
 scan_terminal_pods() {
-  local ns="$1" pod owner cname reason msg
+  local ns="$1" class="${2:-all}" re pod owner cname reason msg
+  case "$class" in
+    hard)      re="$HARD_TERMINAL_REASONS_RE" ;;
+    transient) re="$TRANSIENT_REASONS_RE" ;;
+    *)         re="$TERMINAL_REASONS_RE" ;;
+  esac
   while IFS='|' read -r pod owner; do
     [[ -z "$pod" ]] && continue
     [[ "$owner" == "Job" ]] && continue   # auxiliary workload, not a service
     while IFS='|' read -r cname reason msg; do
       [[ -z "$reason" ]] && continue
-      if [[ "$reason" =~ $TERMINAL_REASONS_RE ]]; then
+      if [[ "$reason" =~ $re ]]; then
         printf '  %s/%s: %s%s\n' "$pod" "$cname" "$reason" "${msg:+ — $msg}"
       fi
     done < <(kubectl -n "$ns" get pod "$pod" \
@@ -147,16 +172,41 @@ ns_all_deploys_ready() {
   return 0
 }
 
-# wait_ns_ready <namespace> <timeout-seconds> — poll to Ready, FAILING FAST on
-# terminal pod states. This replaces long stacked rollout waits with one bounded
-# poll that short-circuits the moment the app is up OR provably stuck.
+# wait_ns_ready <namespace> <timeout-seconds> [imagepull-grace-seconds]
+#   Poll to Ready, failing fast on HARD terminal states but giving TRANSIENT
+#   image-pull states (ErrImagePull/ImagePullBackOff) a grace window to self-heal
+#   before declaring them terminal (ISI-7931 / GH #169). A brief ErrImagePull while
+#   the cold-start mirror is still propagating no longer aborts the run — the
+#   kubelet retries and, once the image resolves, the deploys go Ready and we
+#   return 0. Only if the pull is still failing after the grace window do we treat
+#   it as terminal.
 # Returns: 0 ready | 1 terminal state (reason already printed) | 2 timeout.
 wait_ns_ready() {
-  local ns="$1" timeout="${2:-180}" waited=0 interval=5 term
+  local ns="$1" timeout="${2:-180}" grace="${3:-${IMAGEPULL_GRACE:-60}}"
+  local waited=0 interval=5 hard transient transient_since=-1 announced=0
   while (( waited < timeout )); do
-    term="$(scan_terminal_pods "$ns")"
-    if [[ -n "$term" ]]; then echo "$term" >&2; return 1; fi
+    # HARD states never self-heal — fail the instant one appears.
+    hard="$(scan_terminal_pods "$ns" hard)"
+    if [[ -n "$hard" ]]; then echo "$hard" >&2; return 1; fi
+    # Ready wins even if a transient pull is mid-flight on some other pod.
     if ns_all_deploys_ready "$ns"; then return 0; fi
+    # TRANSIENT image-pull states: start/extend a grace window; only terminal
+    # once the window is exhausted with the pull still failing.
+    transient="$(scan_terminal_pods "$ns" transient)"
+    if [[ -n "$transient" ]]; then
+      if (( transient_since < 0 )); then transient_since=$waited; fi
+      if (( announced == 0 )); then
+        warn "casino has transient image-pull state(s) — allowing ${grace}s grace for the pull to self-heal (mirror may still be propagating):"
+        echo "$transient" >&2; announced=1
+      fi
+      if (( waited - transient_since >= grace )); then
+        warn "transient image-pull state persisted past the ${grace}s grace window — treating as terminal:"
+        echo "$transient" >&2; return 1
+      fi
+    else
+      # Cleared — reset the window so a later, unrelated blip gets its own grace.
+      transient_since=-1; announced=0
+    fi
     sleep "$interval"; waited=$((waited + interval))
   done
   return 2

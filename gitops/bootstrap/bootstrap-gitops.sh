@@ -84,11 +84,31 @@ case "$GITOPS_PROVIDER" in
     # vegasapp-*; but the `[skip ci]` seed builds nothing, so the Gitea registry
     # is empty on first boot. COPY (not build) the baseline casino images
     # GHCR->Gitea now, BEFORE Argo installs, so the first sync has images to pull
-    # and no pod ImagePullBackOffs. NON-FATAL + loud (the script exits 0 and
-    # prints a summary); a no-op when IMAGE_SOURCE=ghcr or crane is absent.
-    log "2.6/4 mirroring baseline casino images GHCR->Gitea (crane copy — best-effort)"
-    bash "$GITOPS_DIR/install/mirror-baseline-images.sh" \
-      || log "WARN: mirror-baseline-images.sh returned non-zero (continuing — see its summary above)"
+    # and no pod ImagePullBackOffs.
+    #
+    # FAIL LOUD (ISI-7931 / GH #169): the mirror now retries transient copies and
+    # then STRICTLY verifies every expected ref landed in the registry. A non-zero
+    # exit means ">=1 image is missing" — installing Argo CD on top of that just
+    # trades a clear error here for a confusing downstream ImagePullBackOff, so we
+    # DIE before step 3/4. (Contrast the seed above, which is intentionally
+    # non-fatal because Argo CD retries a slow seed; a missing IMAGE cannot be
+    # retried away by Argo.) Set MIRROR_STRICT=false to force best-effort.
+    #
+    # Evidence (ISI-7931): tee the mirror output to the evidence bundle so the
+    # per-image result survives the terminal scrollback. EVIDENCE_DIR/STAMP are
+    # exported by deploy-environment.sh; fall back to a sane default for a manual run.
+    log "2.6/4 mirroring baseline casino images GHCR->Gitea (crane copy, retry + strict verify)"
+    _ev_dir="${EVIDENCE_DIR:-$GITOPS_DIR/../.devcontainer/evidence}"
+    _mirror_log="${_ev_dir}/mirror-${STAMP:-manual}.txt"
+    mkdir -p "$_ev_dir" 2>/dev/null || true
+    # pipefail so the tee does not mask the mirror's exit status.
+    set -o pipefail
+    if bash "$GITOPS_DIR/install/mirror-baseline-images.sh" 2>&1 | tee "$_mirror_log"; then
+      log "mirror OK — evidence: ${_mirror_log}"
+    else
+      die "mirror-baseline-images.sh FAILED — >=1 baseline casino image is missing from the Gitea registry (see summary above / ${_mirror_log}). Refusing to install Argo CD onto a registry that would ImagePullBackOff. Fix the mirror (re-run gitops/install/mirror-baseline-images.sh) and redeploy."
+    fi
+    set +o pipefail
 
     log "3/4 installing Argo CD"
     bash "$GITOPS_DIR/install/install-argocd.sh"
