@@ -131,10 +131,30 @@ retry() {
 }
 
 # The 7 casino-BUILT services (the ones render-images.sh rewrites to Gitea).
-# postgres/redis/curl and grafana/k6 are upstream infra images, pulled straight
-# from their public registries in both modes, so they are intentionally NOT
-# mirrored here.
+# postgres/redis/curl stay on their public registries in both modes, so they are
+# intentionally NOT mirrored here (pulled directly). The grafana/k6 loadgen USED
+# to be in that "leave upstream" set too, but under IMAGE_SOURCE=gitea render-
+# images.sh now remaps it to the Gitea registry (ISI-7937), so it IS mirrored —
+# see the dedicated k6 step after the vegasapp loop. Its source is docker.io, not
+# GHCR, so it cannot ride the vegasapp loop.
 SERVICES=(blackjack dashboard dice frontend roulette scoring slots)
+
+# Upstream k6 loadgen image to mirror (ISI-7937). This is the ONE non-casino
+# image render-images.sh rewrites to Gitea under IMAGE_SOURCE=gitea, so it must
+# be pre-populated here or the loadgen pod ImagePullBackOffs on a Docker-Hub-
+# unreachable cluster (the exact silent failure in ISI-7925/ISI-7937). Pinned by
+# DIGEST so the mirrored content is immutable regardless of any upstream retag;
+# the destination keeps the readable :<K6_TAG> tag the manifest references. Must
+# match render-images.sh's GITEA_K6_REPO. Set K6_MIRROR=false to skip (e.g. a
+# cluster that CAN reach docker.io and prefers the direct pull).
+K6_MIRROR="${K6_MIRROR:-true}"
+K6_SRC_IMAGE="${K6_SRC_IMAGE:-docker.io/grafana/k6}"
+K6_TAG="${K6_TAG:-0.54.0}"
+# grafana/k6:0.54.0 multi-arch (amd64+arm64) manifest-list digest, resolved via
+# `crane digest grafana/k6:0.54.0`. Pinning the source here makes the mirror
+# reproducible; bump K6_TAG + K6_DIGEST together when 60-loadgen-k6.yaml bumps.
+K6_DIGEST="${K6_DIGEST:-sha256:1f40432b1cbe7234e977f96c362c9bc550a2d2b583d014dd8669fe40d3e9e755}"
+K6_DST_REPO="${GITEA_K6_REPO:-grafana-k6}"
 
 # Casino "lite" profile (ISI-7653): only the deployed games get mirrored. Drop
 # roulette+dice so a lite bring-up does not waste time/space on images it never
@@ -233,8 +253,36 @@ for svc in "${SERVICES[@]}"; do
   fi
 done
 
+# --- grafana/k6 loadgen (ISI-7937) -----------------------------------------
+# Mirror the upstream loadgen image from docker.io into Gitea so the remapped
+# manifest (render-images.sh, IMAGE_SOURCE=gitea) resolves on a cluster that
+# cannot reach Docker Hub. Pinned by digest (immutable); pushed to the readable
+# :${K6_TAG} tag the manifest references (+ :latest best-effort). Counted in the
+# strict verify so a failed k6 copy fails the bring-up like any vegasapp image.
+k6_ok=0
+if [[ "$K6_MIRROR" == "true" ]]; then
+  k6_src="${K6_SRC_IMAGE}@${K6_DIGEST}"
+  k6_dst="${PUSH_HOST}/${GITEA_OWNER}/${K6_DST_REPO}:${K6_TAG}"
+  k6_dst_latest="${PUSH_HOST}/${GITEA_OWNER}/${K6_DST_REPO}:latest"
+  log "mirroring loadgen ${K6_SRC_IMAGE}:${K6_TAG} (${K6_DIGEST}) -> ${k6_dst}"
+  if retry "grafana-k6 copy" bash -c '"$1" copy "$2" "$3" --insecure 2>&1 | sed "s/^/      crane: /"; exit ${PIPESTATUS[0]}' _ "$CRANE" "$k6_src" "$k6_dst"; then
+    retry "grafana-k6 :latest" "$CRANE" copy "$k6_dst" "$k6_dst_latest" --insecure >/dev/null 2>&1 \
+      || warn "    could not also tag ${K6_DST_REPO}:latest (continuing)"
+    k6_ok=1
+  else
+    warn "    FAILED to mirror ${K6_DST_REPO} (docker.io unreachable, or the Gitea registry rejected the push)"
+  fi
+else
+  log "K6_MIRROR=false — skipping the grafana/k6 loadgen mirror (manifest expected to pull it directly)"
+fi
+
 echo ""
 log "mirror summary: ${copied}/${#SERVICES[@]} image(s) copied to ${PUSH_HOST}/${GITEA_OWNER}/ (tag ${IMAGE_TAG} + latest); ${fellback} used the '${BASELINE_FALLBACK_TAG}' fallback; ${failed} failed"
+if [[ "$K6_MIRROR" == "true" ]]; then
+  [[ "$k6_ok" -eq 1 ]] \
+    && log "loadgen: grafana/k6 mirrored -> ${PUSH_HOST}/${GITEA_OWNER}/${K6_DST_REPO}:${K6_TAG} (+ latest)" \
+    || warn "loadgen: grafana/k6 mirror FAILED — the loadgen pod will ImagePullBackOff once Argo syncs (see strict verify below)"
+fi
 if [[ "$fellback" -gt 0 ]]; then
   warn "${fellback} image(s) were mirrored from '${BASELINE_FALLBACK_TAG}' because the pinned tag '${IMAGE_TAG}' is not published on GHCR."
   warn "This keeps cold-start green, but the pinned '${IMAGE_TAG}' content is the newest PUBLIC build, not a build of the '${IMAGE_TAG}' source. The authoritative '${IMAGE_TAG}' image is produced by the in-cluster CI write-back loop (ISI-7826 / child 2)."
@@ -256,6 +304,18 @@ for svc in "${SERVICES[@]}"; do
     missing=$((missing + 1)); missing_list="${missing_list:+$missing_list }vegasapp-${svc}"
   fi
 done
+
+# Verify the mirrored k6 loadgen ref too (ISI-7937), so a loadgen that would
+# ImagePullBackOff is caught HERE, not as a silent not-Running pod.
+if [[ "$K6_MIRROR" == "true" ]]; then
+  k6_ref="${PUSH_HOST}/${GITEA_OWNER}/${K6_DST_REPO}:${K6_TAG}"
+  if retry "verify ${K6_DST_REPO}" "$CRANE" manifest "$k6_ref" --insecure >/dev/null 2>&1; then
+    log "    ok: ${k6_ref}"
+  else
+    warn "    MISSING in registry: ${k6_ref}"
+    missing=$((missing + 1)); missing_list="${missing_list:+$missing_list }${K6_DST_REPO}"
+  fi
+fi
 
 if [[ "$missing" -gt 0 ]]; then
   warn "${missing} expected image(s) are MISSING from the Gitea registry: ${missing_list}"

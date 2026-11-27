@@ -252,10 +252,11 @@ if [[ -d "$EXPECTED_SRC" ]]; then
   # the 7 casino-built services. This gate FAILS if the seeded manifests regress
   # to the upstream GHCR images (e.g. Argo CD pinned back to
   # ghcr.io/henrikrexed/otel-training/vegasapp-*) — the exact drift ISI-7867 fixed.
-  # Only the 7 vegasapp-* refs are asserted: infra images (postgres/redis/curl)
-  # and the upstream grafana/k6 loadgen are not casino-built and stay on public
-  # upstreams in BOTH modes. The fork exercise (IMAGE_SOURCE=ghcr) legitimately
-  # seeds GHCR refs, so the gate inverts when that is explicitly set.
+  # The 7 vegasapp-* refs are asserted here; the grafana/k6 loadgen ref gets its
+  # own gate just below (ISI-7937 — it is now remapped to Gitea too). Infra images
+  # (postgres/redis/curl) are not casino-built and stay on public upstreams in
+  # BOTH modes. The fork exercise (IMAGE_SOURCE=ghcr) legitimately seeds GHCR
+  # refs, so the gate inverts when that is explicitly set.
   EXPECT_IMAGE_SOURCE="${IMAGE_SOURCE:-gitea}"
   EXPECT_REGISTRY="${GITEA_REGISTRY:-gitea.local:30001}"
   vegas_total=0; vegas_gitea=0; vegas_ghcr=0; vegas_other=0
@@ -280,6 +281,26 @@ if [[ -d "$EXPECTED_SRC" ]]; then
     pass "seeded vegasapp-* refs resolve to ${EXPECT_REGISTRY}/casino (in-cluster Gitea registry; no ghcr.io regression) — $vegas_gitea ref(s)"
   else
     fail "no vegasapp-* image refs under ${EXPECT_REGISTRY}/casino in seeded k8s/ (found $vegas_total total, $vegas_other on other hosts) — seed may not have rendered IMAGE_SOURCE=gitea"
+  fi
+  # --- loadgen k6-image gate (ISI-7937) --------------------------------------
+  # The k6 loadgen was the ONE image never mirrored AND never remapped: it stayed
+  # on docker.io in both modes, so on a Docker-Hub-unreachable cluster the loadgen
+  # pod ImagePullBackOff'd SILENTLY (ISI-7649 keeps it out of the service health
+  # gate). Under IMAGE_SOURCE=gitea render-images.sh now rewrites it to
+  # ${EXPECT_REGISTRY}/casino/grafana-k6:<tag> and mirror-baseline-images.sh
+  # pre-populates it. This gate asserts the seeded loadgen manifest was remapped
+  # (no docker.io/grafana/k6 regression) so the fix cannot quietly rot. Under the
+  # fork exercise (IMAGE_SOURCE=ghcr) the loadgen legitimately stays on docker.io.
+  k6_ref=$(grep -rhE '^[[:space:]]*image:[[:space:]]' "$WORK/k8s"/*.yaml 2>/dev/null \
+           | grep -oE '[^"[:space:]]*(grafana/k6|grafana-k6):[A-Za-z0-9._-]+' | head -1)
+  if [[ -z "$k6_ref" ]]; then
+    info "no k6 loadgen image ref found in seeded k8s/ (loadgen manifest absent? — section 4 of deploy/casino/verify.sh is the runtime authority)"
+  elif [[ "$EXPECT_IMAGE_SOURCE" == "ghcr" ]]; then
+    info "IMAGE_SOURCE=ghcr (fork exercise) — loadgen k6 ref left on docker.io ($k6_ref); no remap expected"
+  elif [[ "$k6_ref" == *"$EXPECT_REGISTRY/"* ]]; then
+    pass "seeded loadgen k6 ref resolves to ${EXPECT_REGISTRY} (mirrored, no docker.io ImagePullBackOff) — $k6_ref"
+  else
+    fail "REGRESSION: seeded loadgen k6 ref ($k6_ref) is NOT remapped to ${EXPECT_REGISTRY} — the loadgen will ImagePullBackOff on a Docker-Hub-unreachable cluster (ISI-7937). Ensure render-images.sh remapped it and mirror-baseline-images.sh mirrored grafana/k6."
   fi
   # Per-attendee cluster name must be RESOLVED + consistent so an attendee can
   # filter their own data on a shared tenant with `k8s.cluster.name` ==
@@ -430,6 +451,36 @@ elif [[ "$live_gitea" -gt 0 ]]; then
   pass "all $live_gitea running vegasapp-* Deployment(s) pull from ${EXPECT_REGISTRY}/casino (no ghcr.io at runtime)"
 else
   info "running vegasapp-* images are on neither ghcr.io nor ${EXPECT_REGISTRY} ($live_total ref(s)) — custom registry?"
+fi
+
+# 6a-k6. The loadgen was the one image that escaped the loop (ISI-7937): never
+# mirrored, never remapped, so on a Docker-Hub-unreachable cluster it
+# ImagePullBackOff'd silently (ISI-7649 keeps it out of the service health gate).
+# Assert the LIVE loadgen pulls its k6 image from the Gitea registry (under the
+# gitea default) AND actually has a Running pod — the runtime guard that makes
+# "loadgen not Running" loud at bring-up, not a gap discovered mid-session.
+EXPECT_IMAGE_SOURCE="${IMAGE_SOURCE:-gitea}"
+if kubectl -n "$CASINO_NS" get deploy vegas-casino-loadgen >/dev/null 2>&1; then
+  lg_img=$(kubectl -n "$CASINO_NS" get deploy vegas-casino-loadgen \
+    -o jsonpath='{.spec.template.spec.containers[?(@.name=="k6")].image}' 2>/dev/null)
+  lg_ready=$(kubectl -n "$CASINO_NS" get deploy vegas-casino-loadgen -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
+  if [[ "$EXPECT_IMAGE_SOURCE" != "ghcr" ]]; then
+    if [[ "$lg_img" == *"$EXPECT_REGISTRY/"* ]]; then
+      pass "loadgen k6 image pulls from ${EXPECT_REGISTRY} (mirrored, no docker.io ImagePullBackOff) — $lg_img"
+    else
+      fail "REGRESSION: live loadgen k6 image ($lg_img) is NOT on ${EXPECT_REGISTRY} — will ImagePullBackOff on a Docker-Hub-unreachable cluster (ISI-7937)"
+    fi
+  fi
+  if [[ "${lg_ready:-0}" -gt 0 ]]; then
+    pass "loadgen pod Running (${lg_ready} ready) — generating traffic"
+  else
+    fail "loadgen pod NOT Running (0 ready) — traffic stalled; check the k6 image pull"
+    kubectl -n "$CASINO_NS" get pod -l app.kubernetes.io/component=loadgen \
+      -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.containerStatuses[*]}{.state.waiting.reason}{" "}{end}{"\n"}{end}' 2>/dev/null \
+      | sed 's/^/       /' | tee -a "$EVIDENCE"
+  fi
+else
+  info "no loadgen Deployment on the cluster yet — skipping runtime loadgen check"
 fi
 
 # 6b. Loop-closed, end-to-end (env-gated: VERIFY_IMAGE_LOOP=1). Pushes a benign

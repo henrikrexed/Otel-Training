@@ -141,13 +141,40 @@ info "Planted-defect services (labs/defects.md) will show broken trace"
 info "propagation / missing logs by design."
 
 # --- 4. Load generator ------------------------------------------------------
+# Explicit loadgen guard (ISI-7937): the k6 loadgen is intentionally kept OUT of
+# the service health gate (ISI-7649 scan_terminal_pods skips it so a slow init
+# never blocks bring-up), which also made "loadgen never Ran" SILENT. This check
+# re-surfaces it loudly — including the pod's image + waiting reason — so a k6
+# ImagePullBackOff (the ISI-7925/ISI-7937 root cause: grafana/k6 unmirrored on a
+# Docker-Hub-unreachable cluster) is an obvious FAIL here, not an invisible gap.
 hdr "4. Load generator driving traffic"
 if kubectl -n "$NS" get deploy vegas-casino-loadgen >/dev/null 2>&1; then
   ready=$(kubectl -n "$NS" get deploy vegas-casino-loadgen -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
   if [[ "${ready:-0}" -gt 0 ]]; then
     pass "k6 load-gen running (generating traffic)"
   else
-    fail "k6 load-gen deployment not ready (check pod/init status)"
+    fail "k6 load-gen deployment has no Running pod (0 ready) — traffic is NOT being generated"
+    # Surface WHY: the k6 pod's image + the container/init waiting reason, so an
+    # ImagePullBackOff on the loadgen image is immediately diagnosable.
+    lg_pod=$(kubectl -n "$NS" get pod -l app.kubernetes.io/component=loadgen \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [[ -n "$lg_pod" ]]; then
+      lg_img=$(kubectl -n "$NS" get pod "$lg_pod" \
+        -o jsonpath='{range .spec.containers[*]}{.name}={.image}{"\n"}{end}' 2>/dev/null)
+      lg_reason=$(kubectl -n "$NS" get pod "$lg_pod" \
+        -o jsonpath='{range .status.containerStatuses[*]}{.name}: {.state.waiting.reason} {.state.waiting.message}{"\n"}{end}' 2>/dev/null)
+      info "loadgen pod: $lg_pod"
+      info "image(s): $lg_img"
+      [[ -n "${lg_reason// /}" ]] && info "waiting: $lg_reason"
+      if printf '%s' "$lg_reason" | grep -Eqi 'ImagePullBackOff|ErrImagePull'; then
+        info "-> loadgen image cannot be pulled. On IMAGE_SOURCE=gitea the k6 image must be"
+        info "   mirrored into the Gitea registry (gitops/install/mirror-baseline-images.sh,"
+        info "   ISI-7937); confirm grafana-k6:<tag> resolves there and the manifest was"
+        info "   rendered with render-images.sh (IMAGE_SOURCE=gitea)."
+      fi
+    else
+      info "no loadgen pod found for selector app.kubernetes.io/component=loadgen"
+    fi
   fi
 else
   fail "load-gen deployment vegas-casino-loadgen not found"
