@@ -559,20 +559,20 @@ so this is the one place the full flow is written down.
   as Argo syncs.
 - **Branch B — casino application code** (`apps/casino/**`; the catalog
   **A-series** instrumentation labs and any lab that edits service source).
-  Edit → PR/MR → **wait for the image CI (Gitea Actions `casino-images`) to go
-  green** → merge → **wait for the image build + `:<sha>` write-back commit** →
-  Argo CD syncs → pods roll to the new image → test. Those extra steps are real:
-  nothing changes in the cluster until the new image is built and its `:<sha>`
-  tag is committed back into `k8s/`.
+  Edit → PR/MR → **merge** (in Gitea the image CI does **not** run on the PR —
+  merging `apps/casino/**` to `main` triggers it) → **wait for the image CI
+  (Gitea Actions `casino-images`) to go green** → it builds the image + commits
+  the `:<sha>` write-back → Argo CD syncs → pods roll to the new image → test.
+  Those extra steps are real: nothing changes in the cluster until the new image
+  is built and its `:<sha>` tag is committed back into `k8s/`.
 
 ```mermaid
 flowchart TB
   edit["Edit a file in your casino clone"] --> pr["Open a PR / MR"]
   pr --> branch{"What did you change?"}
   branch -- "config / manifest under k8s/ (A)" --> mergeA["Merge"]
-  branch -- "apps/casino code (B)" --> ci["Wait for image CI green"]
-  ci --> mergeB["Merge"]
-  mergeB --> build["CI builds images, tags :sha,<br/>commits :sha back to k8s/"]
+  branch -- "apps/casino code (B)" --> mergeB["Merge"]
+  mergeB --> build["Image CI runs: builds images, tags :sha,<br/>writes :sha back to k8s/ — wait for green"]
   mergeA --> argo["Argo CD syncs the manifest"]
   build --> argo
   argo --> rollout["Pods roll to the new spec"]
