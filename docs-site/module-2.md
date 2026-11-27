@@ -371,9 +371,11 @@ host (Gitea fallback: `gitea-pr.sh "feat(slots): add casino.slots.spin money-pat
 span"`), but merging triggers an image build, not a direct sync.
 
 !!! tip "Ship it — Branch B (`apps/casino/**` code)"
-    Open the PR/MR, **wait for the image CI to go green**, merge, then **wait for
-    the image build + `:<sha>` write-back commit** before Argo CD syncs and the
-    slots pods roll to the new image (hit **Refresh** at
+    Open the PR/MR and **merge it** — in Gitea the image CI does **not** run on
+    the PR. Merging `apps/casino/**` to `main` triggers the image CI (Gitea
+    Actions `casino-images`); **watch that run go green** — it builds the images,
+    tags `:<sha>`, and writes `:<sha>` back into `k8s/`. Only then does Argo CD
+    sync and the slots pods roll to the new image (hit **Refresh** at
     `http://localhost:30002` to nudge the poll). Full flow:
     [the GitOps loop](setup.md#ship-it).
 
