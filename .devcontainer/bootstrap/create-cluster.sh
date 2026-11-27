@@ -94,6 +94,64 @@ record_state() {
   printf '%s\n' "$CLUSTER_NAME" > "$STATE_FILE" 2>/dev/null || true
 }
 
+# heal_containerd_config_path — ISI-7930 / GH #168. The registry config_path
+#   [plugins."io.containerd.grpc.v1.cri".registry]
+#     config_path = "/etc/containerd/certs.d"
+# is only applied by kind-config.yaml containerdConfigPatches at cluster
+# CREATION. ensure_cluster REUSES a pre-existing cluster, so one created before
+# that patch landed (pre-ISI-7638) has no config_path: containerd never reads
+# the certs.d hosts.toml we write below and dials the alias directly ->
+# "lookup gitea.local: no such host" -> casino pods ImagePullBackOff, the new
+# :0.40 ReplicaSet never pulls, Argo reports Synced+Degraded. Self-heal in
+# place: patch config.toml and restart containerd so certs.d takes effect.
+#
+# Echoes the node name on stdout ONLY when it actually healed+restarted the node
+# (so the caller re-waits for readiness); silent when already wired. Returns
+# non-zero on an unrecoverable patch/restart failure (caller prints a loud,
+# actionable recreate instruction — acceptance: Ready OR fail loudly).
+heal_containerd_config_path() {
+  local node="$1"
+  local cfg=/etc/containerd/config.toml
+  # Idempotent fast path: already pointing at certs.d -> nothing to do. This is
+  # the normal case for a freshly created cluster (patch applied at create) and
+  # for every postStart rerun, so no healthy cluster ever gets a needless restart.
+  if docker exec "$node" grep -qE '^[[:space:]]*config_path[[:space:]]*=[[:space:]]*"/etc/containerd/certs\.d"' "$cfg" 2>/dev/null; then
+    return 0
+  fi
+  log "  $node: containerd config_path -> /etc/containerd/certs.d MISSING (reused pre-ISI-7638 cluster); self-healing" >&2
+  # Patch inside the node. Three cases, in order: (a) an existing empty/wrong
+  # config_path line -> rewrite it; (b) the registry table exists but has no
+  # config_path -> inject the line under the header; (c) no registry table at
+  # all -> append a fresh one. The final grep asserts EXACTLY one certs.d
+  # config_path line (acceptance: grep -c config_path -> 1).
+  if ! docker exec "$node" sh -s <<'NODE' 2>/dev/null
+set -e
+cfg=/etc/containerd/config.toml
+hdr='[plugins."io.containerd.grpc.v1.cri".registry]'
+if grep -qE '^[[:space:]]*config_path[[:space:]]*=' "$cfg"; then
+  sed -i -E 's#^([[:space:]]*)config_path[[:space:]]*=.*#\1config_path = "/etc/containerd/certs.d"#' "$cfg"
+elif grep -qF "$hdr" "$cfg"; then
+  awk '{ print }
+       index($0, "[plugins.\"io.containerd.grpc.v1.cri\".registry]") { print "  config_path = \"/etc/containerd/certs.d\"" }' \
+       "$cfg" > "$cfg.isi7930" && mv "$cfg.isi7930" "$cfg"
+else
+  printf '\n%s\n  config_path = "/etc/containerd/certs.d"\n' "$hdr" >> "$cfg"
+fi
+test "$(grep -cE '^[[:space:]]*config_path[[:space:]]*=[[:space:]]*"/etc/containerd/certs\.d"' "$cfg")" = 1
+NODE
+  then
+    log "  WARN: $node: failed to patch containerd config.toml for config_path" >&2
+    return 1
+  fi
+  # containerd reads config.toml only at startup — restart to load config_path.
+  if docker exec "$node" systemctl restart containerd 2>/dev/null; then
+    printf '%s\n' "$node"   # signal to caller: healed + restarted, re-wait Ready
+    return 0
+  fi
+  log "  WARN: $node: patched config.toml but could not restart containerd" >&2
+  return 1
+}
+
 # wire_registry_mirror — teach node-level containerd to pull the Gitea registry
 # alias over plain http, and resolve the same alias from the codespace host
 # (ISI-7638, WS-D of ISI-7624).
@@ -121,7 +179,7 @@ EOF
 )"
 
   log "wiring Gitea registry mirror '${REGISTRY_ALIAS}' into node containerd (best-effort)"
-  local nodes node rc=0
+  local nodes node rc=0 healed="" healed_node
   nodes="$(kind get nodes --name "$CLUSTER_NAME" 2>/dev/null || true)"
   if [[ -z "$nodes" ]]; then
     log "WARN: could not list kind nodes for '$CLUSTER_NAME' — skipping mirror wiring"
@@ -136,11 +194,29 @@ EOF
       log "  WARN: $node: failed to install hosts.toml (continuing)"
       rc=1
     fi
+    # ISI-7930: the hosts.toml above is inert unless containerd's config.toml has
+    # config_path = /etc/containerd/certs.d. New clusters get it from
+    # kind-config.yaml at create; a REUSED pre-ISI-7638 cluster does not, so
+    # self-heal it here (idempotent; only restarts containerd when it was missing).
+    if healed_node="$(heal_containerd_config_path "$node")"; then
+      [[ -n "$healed_node" ]] && healed="$healed $healed_node"
+    else
+      rc=1
+      log "  WARN: $node: containerd config_path could not be healed — Gitea registry pulls"
+      log "        (gitea.local:30001/...) will fail with 'no such host' and casino pods will"
+      log "        ImagePullBackOff. Recreate the cluster to apply it cleanly:"
+      log "          kind delete cluster --name '$CLUSTER_NAME' && bash '$SCRIPT_DIR/create-cluster.sh'"
+    fi
   done
-  # config_path is set via kind-config.yaml containerdConfigPatches at create
-  # time; modern kind node images also default it. No containerd restart is
-  # needed — certs.d is read per-pull, so a freshly written hosts.toml is picked
-  # up on the next image pull.
+
+  # If we restarted containerd on any node to apply config_path (ISI-7930), its
+  # kubelet briefly drops the API connection; wait for Ready again so downstream
+  # steps (seed, Argo, casino) do not race a NotReady node.
+  if [[ -n "${healed// /}" ]]; then
+    log "containerd restarted to apply config_path on:${healed} — re-waiting for node readiness"
+    kubectl --kubeconfig "$KUBECONFIG_PATH" wait --for=condition=Ready nodes --all --timeout=120s >/dev/null 2>&1 \
+      || log "WARN: node(s) not Ready within 120s after containerd restart — check 'kubectl get nodes'"
+  fi
 
   # Host-side alias so `crane`/`docker` on the codespace resolve the SAME ref the
   # Deployments use. Best-effort: needs sudo; a failure only affects the push
