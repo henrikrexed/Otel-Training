@@ -42,7 +42,7 @@ loop is identical either way, only the git host differs.
    your two GitLab secrets, post-create installs Argo CD and points the casino
    Application at **your fork**. (If the `GITLAB_*` secrets are absent, the
    bootstrap falls back to in-cluster Gitea and prints how to switch — see
-   [§4](#4-open-the-gitops-loop).)
+   [§4](#ship-it).)
 
 !!! note "You never paste a token into the repo"
     Tokens live only as Codespace secrets and are read at runtime. Nothing is
@@ -173,9 +173,9 @@ gitea-pr.sh "fix(slots): propagate trace context across the scoring hop"
 opens a pull request against `main` — printing the PR URL. On the **GitLab
 default** you push the branch yourself and open the **MR** in your fork's web
 UI; either way the helper/agent produces a signed-off commit on a branch. **Review and merge it in
-your git host's UI** (see [§4 — Open the GitOps loop](#4-open-the-gitops-loop) for
+your git host's UI** (see [§4 — Ship it](#ship-it) for
 the Gitea and GitLab URLs); merging `main` is what triggers the Argo CD sync.
-Never push straight to `main`. (Full walkthrough: [§4](#4-open-the-gitops-loop).)
+Never push straight to `main`. (Full walkthrough: [§4](#ship-it).)
 
 ### 4. One safe read-only task
 
@@ -543,12 +543,48 @@ bash gitops/bootstrap/bootstrap-gitops.sh
     ones that also need `DT_PLATFORM_TOKEN` —
     see [`DT_PLATFORM_TOKEN`](#dt_platform_token-scopes-user-permissions-and-whether-you-need-it).)
 
-## 4. Open the GitOps loop
+## 4. Ship it — the GitOps loop {#ship-it}
 
 Your lab mechanic for the whole session: **branch → commit → push → PR/MR on
 your git host → merge → Argo CD deploys it** (M1 walks this end to end with
 `opencode`). No `kubectl apply` into the `casino` namespace (Argo CD's
-self-heal would revert it anyway).
+self-heal would revert it anyway). Every exercise ends by sending you back here,
+so this is the one place the full flow is written down.
+
+**Two loops, one tail — which one you are in depends on _what_ you edited:**
+
+- **Branch A — config / manifest** (env vars and Kubernetes YAML under `k8s/`;
+  the module exercises that edit a deployment). Edit → PR/MR → merge → **Argo CD
+  syncs the YAML directly**. No CI, no image build — the change is live as soon
+  as Argo syncs.
+- **Branch B — casino application code** (`apps/casino/**`; the catalog
+  **A-series** instrumentation labs and any lab that edits service source).
+  Edit → PR/MR → **wait for the image CI (Gitea Actions `casino-images`) to go
+  green** → merge → **wait for the image build + `:<sha>` write-back commit** →
+  Argo CD syncs → pods roll to the new image → test. Those extra steps are real:
+  nothing changes in the cluster until the new image is built and its `:<sha>`
+  tag is committed back into `k8s/`.
+
+```mermaid
+flowchart TB
+  edit["Edit a file in your casino clone"] --> pr["Open a PR / MR"]
+  pr --> branch{"What did you change?"}
+  branch -- "config / manifest under k8s/ (A)" --> mergeA["Merge"]
+  branch -- "apps/casino code (B)" --> ci["Wait for image CI green"]
+  ci --> mergeB["Merge"]
+  mergeB --> build["CI builds images, tags :sha,<br/>commits :sha back to k8s/"]
+  mergeA --> argo["Argo CD syncs the manifest"]
+  build --> argo
+  argo --> rollout["Pods roll to the new spec"]
+  rollout --> test["Run the Verify steps"]
+```
+
+!!! note "Argo CD is poll-only — if nothing happens, Refresh → Sync"
+    Argo CD polls your fork on an interval; there is no webhook, so a just-merged
+    change can take a minute to appear. To skip the wait, open the `casino`
+    Application at http://localhost:30002 and click **Refresh**, then **Sync**. A
+    stuck sync almost always means a YAML render error — check the Application
+    status before you debug anything else.
 
 **The shape of the lab** — everything runs in one kind cluster inside your
 Codespace:

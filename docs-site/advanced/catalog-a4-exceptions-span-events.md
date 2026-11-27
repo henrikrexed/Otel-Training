@@ -139,9 +139,18 @@ gitea-pr.sh "fix(slots): record exceptions as span events + ERROR status on the 
 
 `gitea-pr.sh` branches `opencode/<slug>`, commits with a DCO sign-off, pushes, and
 prints the PR URL. **Review and merge the PR in the Gitea UI**
-(`http://localhost:30001/casino/casino/pulls`) — Argo CD then syncs the slots
-service. Trigger a few failing spins (an out-of-range bet, or point slots at a
-down scoring endpoint) so error spans flow.
+(`http://localhost:30001/casino/casino/pulls`). This is **casino application
+code**, so merging kicks off the image CI — do not expect Argo CD to sync until
+the new image exists:
+
+!!! tip "Ship it — Branch B (`apps/casino/**` code)"
+    Open the PR, **wait for the image CI (Gitea Actions `casino-images`) to go
+    green**, merge, then **wait for the image build + `:<sha>` write-back commit**
+    before Argo CD syncs and the slots pods roll to the new image. Full flow:
+    [the GitOps loop](../setup.md#ship-it).
+
+Once the new image is rolled out, trigger a few failing spins (an out-of-range
+bet, or point slots at a down scoring endpoint) so error spans flow.
 
 ## Verify
 

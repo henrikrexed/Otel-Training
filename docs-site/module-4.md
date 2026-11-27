@@ -65,6 +65,11 @@ Ship and merge the PR, then wait for the rollout and give it 5 minutes of traffi
 gitea-pr.sh "chore(blackjack): 10% head sampling (temporary, to be reverted)"
 ```
 
+!!! tip "Ship it — Branch A (config/manifest)"
+    Both this change and the revert edit `k8s/33-blackjack.yaml`, so merging is
+    enough — no CI, no image build, Argo CD syncs the YAML directly. Full flow:
+    [the GitOps loop](setup.md#ship-it).
+
 **What you should see in Dynatrace:** blackjack spans drop to roughly 10%.
 Now filter your view to `status = ERROR`: errors dropped to ~10% too. You
 saved money and lost ~90% of your visibility into the exact requests you

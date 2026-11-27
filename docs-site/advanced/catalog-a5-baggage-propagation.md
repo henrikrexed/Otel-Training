@@ -164,9 +164,19 @@ gitea-pr.sh "feat(casino): propagate player.tier via baggage; scoring enriches s
 
 `gitea-pr.sh` branches `opencode/<slug>`, commits with a DCO sign-off, pushes, and
 prints the PR URL. **Review and merge the PR in the Gitea UI**
-(`http://localhost:30001/casino/casino/pulls`) — Argo CD then syncs both services.
-Play a few spins as different tiers (set the `x-player-tier` header to
-`gold` / `silver` / `bronze`) so tiered spans flow through both services.
+(`http://localhost:30001/casino/casino/pulls`). This is **casino application
+code**, so merging kicks off the image CI — do not expect Argo CD to sync until
+the new images exist:
+
+!!! tip "Ship it — Branch B (`apps/casino/**` code)"
+    Open the PR, **wait for the image CI (Gitea Actions `casino-images`) to go
+    green**, merge, then **wait for the image build + `:<sha>` write-back commit**
+    before Argo CD syncs and **both** services' pods roll to the new image. Full
+    flow: [the GitOps loop](../setup.md#ship-it).
+
+Once the new images are rolled out, play a few spins as different tiers (set the
+`x-player-tier` header to `gold` / `silver` / `bronze`) so tiered spans flow
+through both services.
 
 ## Verify
 
