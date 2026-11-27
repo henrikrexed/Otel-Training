@@ -157,8 +157,17 @@ gitea-pr.sh "feat(roulette): add casino.roulette.spin span matching the slots co
 
 `gitea-pr.sh` branches `opencode/<slug>`, commits with a DCO sign-off, pushes, and
 prints the PR URL. **Review and merge the PR in the Gitea UI**
-(`http://localhost:30001/casino/casino/pulls`) — Argo CD then syncs the roulette
-service. Play a few rounds of roulette so new spans flow.
+(`http://localhost:30001/casino/casino/pulls`). This is **casino application
+code**, so merging kicks off the image CI — do not expect Argo CD to sync until
+the new image exists:
+
+!!! tip "Ship it — Branch B (`apps/casino/**` code)"
+    Open the PR, **wait for the image CI (Gitea Actions `casino-images`) to go
+    green**, merge, then **wait for the image build + `:<sha>` write-back commit**
+    before Argo CD syncs and the roulette pods roll to the new image. Full flow:
+    [the GitOps loop](../setup.md#ship-it).
+
+Once the new image is rolled out, play a few rounds of roulette so new spans flow.
 
 ## Verify
 

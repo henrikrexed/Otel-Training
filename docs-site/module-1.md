@@ -207,10 +207,15 @@ the rollout. Argo CD picks up the merged commit and rolls the slots deployment
 kubectl -n casino rollout status deploy/vegas-casino-slots
 ```
 
+!!! tip "Ship it — Branch A (config/manifest)"
+    This edits a deployment manifest under `k8s/`, so merging is enough — no CI,
+    no image build, Argo CD syncs the YAML directly. Full flow:
+    [the GitOps loop](setup.md#ship-it).
+
 !!! note "GitLab path"
     If your room runs the external GitLab fork, the loop is identical — opencode
     edits, you open and merge an **MR** on your fork, Argo CD syncs. See
-    [M0 §4](setup.md#4-open-the-gitops-loop).
+    [M0 §4](setup.md#ship-it).
 
 ## Dynatrace check
 

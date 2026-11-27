@@ -225,6 +225,11 @@ kubectl -n casino rollout status deploy/vegas-casino-scoring
 kubectl -n casino get pods -l app.kubernetes.io/name=vegas-casino -o name | grep scoring
 ```
 
+!!! tip "Ship it — Branch A (config/manifest)"
+    The ConfigMap and Instrumentation CR are manifests under `k8s/`, so merging
+    is enough — no CI, no image build, Argo CD syncs the YAML directly. Full
+    flow: [the GitOps loop](setup.md#ship-it).
+
 !!! tip "Not rolling?"
      Argo CD only syncs files it can render. YAML-indentation errors in the
      ConfigMap (the `|` block) are the usual suspect — check the Argo CD app
@@ -360,11 +365,19 @@ public Payout settleRound(@SpanAttribute("casino.game.name") String game,
 
 ### ④ Apply — opencode → PR/MR → merge → Argo CD sync
 
-Same GitOps loop as Exercise A: ship the slots change from inside `~/casino`
-through your git host (Gitea fallback: `gitea-pr.sh "feat(slots): add
-casino.slots.spin money-path span"`), review and merge, and let Argo CD roll
-the slots deployment (hit **Refresh** at `http://localhost:30002`). Then play
-a few rounds of slots to generate traffic.
+This time you edited **slots service source** (`apps/casino/**`), not a
+manifest — so it is **Branch B**: ship it from inside `~/casino` through your git
+host (Gitea fallback: `gitea-pr.sh "feat(slots): add casino.slots.spin money-path
+span"`), but merging triggers an image build, not a direct sync.
+
+!!! tip "Ship it — Branch B (`apps/casino/**` code)"
+    Open the PR/MR, **wait for the image CI to go green**, merge, then **wait for
+    the image build + `:<sha>` write-back commit** before Argo CD syncs and the
+    slots pods roll to the new image (hit **Refresh** at
+    `http://localhost:30002` to nudge the poll). Full flow:
+    [the GitOps loop](setup.md#ship-it).
+
+Once the new image is rolled out, play a few rounds of slots to generate traffic.
 
 ### ⑤ Verify — Dynatrace validation checkpoint
 
